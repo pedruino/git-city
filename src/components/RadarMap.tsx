@@ -81,13 +81,21 @@ export default function RadarMap({
   useEffect(() => {
     let raw: number;
     if (flyMode) {
-      raw = -(playerYaw * 180) / Math.PI;
+      raw = -((playerYaw ?? 0) * 180) / Math.PI;
     } else {
-      const dx = cameraTargetX - cameraX;
-      const dz = cameraTargetZ - cameraZ;
+      // Camera props may be undefined during first render or when the 3D
+      // scene hasn't mounted yet — guard against NaN propagating into SVG
+      // transforms (which throws "Expected number" warnings).
+      const tx = cameraTargetX ?? 0;
+      const tz = cameraTargetZ ?? 0;
+      const cx = cameraX ?? 0;
+      const cz = cameraZ ?? 0;
+      const dx = tx - cx;
+      const dz = tz - cz;
       // Heading clockwise from north: atan2(east, north) where north = -dz
       raw = -(Math.atan2(dx, -dz) * 180) / Math.PI;
     }
+    if (!Number.isFinite(raw)) return;
     // Normalize diff to [-180, 180] so we always take the shortest arc
     const diff = ((raw - prevDeg.current) % 360 + 540) % 360 - 180;
     const next = prevDeg.current + diff;

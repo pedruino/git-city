@@ -489,24 +489,34 @@ function CameraFocus({
       );
     } else {
       // On mobile, shift lookAt target down so building appears above the bottom sheet,
-      // and pull camera further back to show more of the building
+      // and pull camera further back to show more of the building.
       const isMobile = window.innerWidth < 640;
       const mobileOffset = isMobile ? 60 : 0;
-      const dist = isMobile ? 300 : 180;
-      const camHeight = isMobile ? 200 : 120;
+      // Scale distance with building height, but keep camera relatively low
+      // so the building frames against the sky instead of the ground.
+      const baseDist = isMobile ? 300 : 220;
+      const heightBoost = Math.max(0, bA.height - 80) * 1.6;
+      const dist = baseDist + heightBoost;
+      // Camera sits roughly at 2/3 the building height — high enough to see
+      // the top from a distance, low enough to keep the building framed.
+      const camHeight = isMobile ? 200 : Math.max(60, bA.height * 0.4);
 
       // Camera goes to the outside of the building (away from center) so it looks
-      // at the front face without other buildings blocking the view
+      // at the front face without other buildings blocking the view.
       const bx = bA.position[0], bz = bA.position[2];
-      const bLen = Math.sqrt(bx * bx + bz * bz) || 1;
+      const bLen = Math.sqrt(bx * bx + bz * bz);
+      // When building is at/near the city origin (e.g. only dev = rank #1),
+      // the outward direction is undefined. Fall back to a fixed diagonal.
+      const dirX = bLen < 1 ? 0.707 : bx / bLen;
+      const dirZ = bLen < 1 ? 0.707 : bz / bLen;
       endPos.current.set(
-        bx + (bx / bLen) * dist,
-        bA.height + camHeight,
-        bz + (bz / bLen) * dist
+        bx + dirX * dist,
+        camHeight,
+        bz + dirZ * dist
       );
       endLook.current.set(
         bx,
-        Math.max(0, bA.height + 15 - mobileOffset),
+        Math.max(20, bA.height * 0.35 - mobileOffset),
         bz
       );
     }

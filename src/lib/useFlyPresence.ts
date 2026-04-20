@@ -48,10 +48,12 @@ export function useFlyPresence(
   const flyingRef = useRef(flying);
   flyingRef.current = flying;
 
-  // Connect always (even without login) to see other pilots in explore mode
+  // Connect always (even without login) to see other pilots in explore mode.
+  // Skip entirely when no host is configured (local dev without PartyKit) —
+  // prevents the browser from retrying a refused ws connection every second.
   useEffect(() => {
-
-    const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST ?? "localhost:1999";
+    const host = process.env.NEXT_PUBLIC_PARTYKIT_HOST;
+    if (!host) return;
 
     const ws = new PartySocket({
       host,
