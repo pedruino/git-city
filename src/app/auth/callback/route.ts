@@ -5,7 +5,7 @@ import { checkAchievements } from "@/lib/achievements";
 import { cacheEmailFromAuth, touchLastActive, ensurePreferences } from "@/lib/notification-helpers";
 import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
 import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
-import { fetchGitHubDeveloperData } from "@/lib/github-api";
+import { getProviderFromSession } from "@/lib/providers";
 import { calculateGithubXp } from "@/lib/xp";
 
 // Extend timeout for GitHub API calls during login
@@ -26,11 +26,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/?error=auth_failed`);
   }
 
-  const githubLogin = (
-    data.user.user_metadata.user_name ??
-    data.user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const provider = getProviderFromSession(data.user);
+  const identity = provider.extractIdentity(data.user.user_metadata ?? {});
+  const githubLogin = identity?.login ?? "";
 
   const admin = getSupabaseAdmin();
 
@@ -43,9 +41,9 @@ export async function GET(request: Request) {
       .maybeSingle();
 
     if (!existingDev) {
-      // ─── New dev: create building from GitHub data on login ───
+      // ─── New dev: create building from provider data on login ───
       try {
-        const ghData = await fetchGitHubDeveloperData(githubLogin, { allowEmpty: true });
+        const ghData = await provider.fetchDeveloperData(githubLogin, { allowEmpty: true });
 
         const { data: created, error: createErr } = await admin
           .from("developers")
