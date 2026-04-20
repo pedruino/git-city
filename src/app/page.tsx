@@ -1582,9 +1582,10 @@ function HomeContent() {
           );
           if (injected && !didFocusUserParam.current) {
             didFocusUserParam.current = true;
-            setFocusedBuilding(userParam);
+            // Just open the profile card; skip camera focus animation — it
+            // ends up behind landmarks / outside world bounds on sparse
+            // cities and feels like a black screen. User can orbit manually.
             setSelectedBuilding(injected);
-            setExploreMode(true);
           }
         } finally {
           fetchingUserParam.current = false;
@@ -1594,11 +1595,9 @@ function HomeContent() {
     }
 
     if (!didFocusUserParam.current) {
-      // First focus: enter explore mode
+      // First visit with ?user= — open profile card only, leave camera alone.
       didFocusUserParam.current = true;
-      setFocusedBuilding(userParam);
       setSelectedBuilding(found);
-      setExploreMode(true);
 
       // Building from cache/snapshot may have stale claimed status — refresh from DB
       if (!found.claimed) {
