@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
+import { providerConfig } from "@/lib/auth-config";
 import {
   generateCityLayout,
   DISTRICT_NAMES,
@@ -863,29 +864,23 @@ function HomeContent() {
     }
   }, [searchParams]);
 
-  // Forward ref from localStorage to auth callback URL.
-  // Accepts optional provider — defaults to github to keep existing call sites working.
-  const handleSignInWithRef = useCallback(async (provider: "github" | "gitlab" = "github") => {
+  // Server-side sign-in entry point. Handles provider selection (env), SAML
+  // pre-redirect, and OAuth kickoff. Client just forwards to the route with
+  // the optional referrer param.
+  const handleSignInWithRef = useCallback(async () => {
     trackSignInClicked("city");
-    const supabase = createBrowserSupabase();
-    let redirectTo = `${window.location.origin}/auth/callback`;
+    let refParam = "";
     try {
       const raw = localStorage.getItem("gc_ref");
       if (raw) {
         const { login, expires } = JSON.parse(raw);
         if (Date.now() < expires && login) {
-          redirectTo += `?ref=${encodeURIComponent(login)}`;
+          refParam = `&ref=${encodeURIComponent(login)}`;
         }
       }
     } catch { /* ignore */ }
-    const options: { redirectTo: string; scopes?: string } = { redirectTo };
-    if (provider === "gitlab") {
-      options.scopes = "openid profile email read_user read_api";
-    }
-    await supabase.auth.signInWithOAuth({ provider, options });
+    window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
   }, []);
-
-  const gitlabEnabled = process.env.NEXT_PUBLIC_GITLAB_ENABLED === "true";
 
   // Fetch activity feed on mount + poll every 60s
   useEffect(() => {
@@ -3073,7 +3068,7 @@ function HomeContent() {
                               className="btn-press inline-block w-full py-2.5 text-center text-xs text-bg"
                               style={{ backgroundColor: "#4ade80", boxShadow: "2px 2px 0 0 #16a34a" }}
                             >
-                              Sign in with GitHub
+                              Sign in with {providerConfig.displayName}
                             </Link>
                           </div>
                         ) : liveByLogin.has(authLogin) ? (
@@ -3351,19 +3346,13 @@ function HomeContent() {
               <button
                 onClick={() => { handleSignIn(); setMobileMenuOpen(false); }}
                 className="btn-press w-full py-3 text-xs text-bg"
-                style={{ backgroundColor: theme.accent, boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                style={{
+                  backgroundColor: providerConfig.buttonColor || theme.accent,
+                  boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                }}
               >
-                Sign in with GitHub
+                Sign in with {providerConfig.displayName}
               </button>
-              {gitlabEnabled && (
-                <button
-                  onClick={() => { handleSignInWithRef("gitlab"); setMobileMenuOpen(false); }}
-                  className="btn-press mt-2 w-full py-3 text-xs text-bg"
-                  style={{ backgroundColor: "#FC6D26", boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
-                >
-                  Sign in with GitLab
-                </button>
-              )}
             </div>
           )}
 
@@ -3570,8 +3559,8 @@ function HomeContent() {
               </h1>
               <p className="mt-2 text-[10px] leading-relaxed text-cream/80 normal-case">
                 {stats.total_developers > 0
-                  ? `A city of ${stats.total_developers.toLocaleString()} GitHub developers. Find yourself.`
-                  : "A global city of GitHub developers. Find yourself."}
+                  ? `A city of ${stats.total_developers.toLocaleString()} ${providerConfig.displayName} developers. Find yourself.`
+                  : `A global city of ${providerConfig.displayName} developers. Find yourself.`}
               </p>
               <p className="pointer-events-auto mt-1 text-[9px] text-cream/50 normal-case hidden sm:block">
                 built by{" "}
@@ -3704,28 +3693,12 @@ function HomeContent() {
                   }}
                   className="btn-press w-full max-w-60 py-2.5 text-[10px] text-bg"
                   style={{
-                    backgroundColor: theme.accent,
+                    backgroundColor: providerConfig.buttonColor || theme.accent,
                     boxShadow: `3px 3px 0 0 ${theme.shadow}`,
                   }}
                 >
-                  Sign in with GitHub
+                  Sign in with {providerConfig.displayName}
                 </button>
-                {gitlabEnabled && (
-                  <button
-                    onClick={() => {
-                      setWelcomeCtaVisible(false);
-                      localStorage.setItem("gitcity_welcome_seen", "true");
-                      handleSignInWithRef("gitlab");
-                    }}
-                    className="btn-press w-full max-w-60 py-2.5 text-[10px] text-bg"
-                    style={{
-                      backgroundColor: "#FC6D26",
-                      boxShadow: `3px 3px 0 0 ${theme.shadow}`,
-                    }}
-                  >
-                    Sign in with GitLab
-                  </button>
-                )}
                 <button
                   onClick={() => {
                     setWelcomeCtaVisible(false);
@@ -3750,7 +3723,7 @@ function HomeContent() {
                     setUsername(e.target.value);
                     if (feedback?.type === "error") setFeedback(null);
                   }}
-                  placeholder={session ? "search any GitHub username" : "type your GitHub username"}
+                  placeholder={session ? `search any ${providerConfig.displayName} username` : `type your ${providerConfig.displayName} username`}
                   className="min-w-0 flex-1 border-[3px] border-border bg-bg-raised px-3 py-2 text-base sm:text-xs text-cream outline-none transition-colors placeholder:text-dim sm:px-4 sm:py-2.5"
                   style={{ borderColor: undefined }}
                   onFocus={(e) => (e.currentTarget.style.borderColor = theme.accent)}
@@ -4175,11 +4148,11 @@ function HomeContent() {
               }}
               className="btn-press w-full py-2 text-[10px] text-bg"
               style={{
-                backgroundColor: theme.accent,
+                backgroundColor: providerConfig.buttonColor || theme.accent,
                 boxShadow: `2px 2px 0 0 ${theme.shadow}`,
               }}
             >
-              Sign in with GitHub
+              Sign in with {providerConfig.displayName}
             </button>
             <button
               onClick={() => setSignInPromptVisible(false)}
