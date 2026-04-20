@@ -8,6 +8,20 @@ import {
 const GITLAB_API_BASE = "https://gitlab.com/api/v4";
 const FETCH_TIMEOUT_MS = 15_000;
 
+/**
+ * GitLab counts 1 push = 1 event regardless of commits pushed, while GitHub
+ * counts 1 commit = 1 contribution. On average a push has ~3-5 commits, so
+ * GitLab contribution counts are artificially lower. This multiplier scales
+ * GitLab counts to be comparable with GitHub's range so building heights,
+ * rankings, and leaderboards feel right across providers.
+ *
+ * Configurable via GITLAB_CONTRIBUTION_MULTIPLIER env (default 4).
+ */
+function contributionMultiplier(): number {
+  const raw = parseFloat(process.env.GITLAB_CONTRIBUTION_MULTIPLIER ?? "4");
+  return Number.isFinite(raw) && raw > 0 ? raw : 4;
+}
+
 function glHeaders(): HeadersInit {
   const h: HeadersInit = { "User-Agent": "git-city-app" };
   if (process.env.GITLAB_TOKEN) {
@@ -77,15 +91,29 @@ async function fetchUserProjects(userId: number): Promise<GitLabProject[]> {
   return all;
 }
 
-async function fetchContributionCounts(userId: number): Promise<{
+/**
+ * GitLab's public profile calendar exposes per-day contribution counts as JSON
+ * at /users/:username/calendar.json — same data rendered on the profile page.
+ * This is the same source the GitLab UI uses, no API token required for public
+ * profiles. Returns up to 12 months of daily totals.
+ */
+async function fetchContributionCounts(username: string): Promise<{
   lastYear: number;
   allTime: number;
   currentWeek: number;
   activeDays: number;
+  currentStreak: number;
+  longestStreak: number;
 }> {
-  const oneYearAgo = new Date();
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  const sinceIso = oneYearAgo.toISOString().slice(0, 10);
+  const host = "https://gitlab.com";
+  const res = await fetch(`${host}/users/${encodeURIComponent(username)}/calendar.json`, {
+    headers: glHeaders(),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    return { lastYear: 0, allTime: 0, currentWeek: 0, activeDays: 0, currentStreak: 0, longestStreak: 0 };
+  }
+  const calendar = (await res.json()) as Record<string, number>;
 
   const weekStart = new Date();
   const dow = weekStart.getDay();
@@ -93,33 +121,49 @@ async function fetchContributionCounts(userId: number): Promise<{
   weekStart.setHours(0, 0, 0, 0);
 
   let lastYear = 0;
-  let allTime = 0;
   let currentWeek = 0;
-  const activeDaysSet = new Set<string>();
+  let activeDays = 0;
 
-  for (let page = 1; page <= 5; page++) {
-    try {
-      const { data } = await glFetch<GitLabEvent[]>(
-        `/users/${userId}/events?per_page=100&after=${sinceIso}&page=${page}`,
-      );
-      if (data.length === 0) break;
-      for (const ev of data) {
-        lastYear++;
-        allTime++;
-        activeDaysSet.add(ev.created_at.slice(0, 10));
-        if (new Date(ev.created_at) >= weekStart) currentWeek++;
-      }
-      if (data.length < 100) break;
-    } catch {
-      break;
+  // Sort dates to compute streaks.
+  const dates = Object.keys(calendar).sort();
+  const counts: Array<{ date: string; n: number }> = dates.map((d) => ({ date: d, n: calendar[d] ?? 0 }));
+
+  for (const { date, n } of counts) {
+    if (n > 0) {
+      lastYear += n;
+      activeDays++;
+      if (new Date(date) >= weekStart) currentWeek += n;
     }
+  }
+
+  // Streaks: consecutive days with n > 0 ending today (or yesterday if no commits today yet).
+  let longestStreak = 0;
+  let run = 0;
+  for (const { n } of counts) {
+    if (n > 0) {
+      run++;
+      longestStreak = Math.max(longestStreak, run);
+    } else {
+      run = 0;
+    }
+  }
+  let currentStreak = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  for (let i = counts.length - 1; i >= 0; i--) {
+    const { date, n } = counts[i];
+    if (i === counts.length - 1 && n === 0 && (date === today || date === yesterday)) continue;
+    if (n > 0) currentStreak++;
+    else break;
   }
 
   return {
     lastYear,
-    allTime,
+    allTime: lastYear, // calendar.json only returns ~1 year; close enough.
     currentWeek,
-    activeDays: activeDaysSet.size,
+    activeDays,
+    currentStreak,
+    longestStreak,
   };
 }
 
@@ -145,7 +189,14 @@ export async function fetchGitLabDeveloperData(
 
   const [projects, contribs, groupCount] = await Promise.all([
     fetchUserProjects(user.id).catch(() => [] as GitLabProject[]),
-    fetchContributionCounts(user.id).catch(() => ({ lastYear: 0, allTime: 0, currentWeek: 0, activeDays: 0 })),
+    fetchContributionCounts(resolvedLogin).catch(() => ({
+      lastYear: 0,
+      allTime: 0,
+      currentWeek: 0,
+      activeDays: 0,
+      currentStreak: 0,
+      longestStreak: 0,
+    })),
     fetchGroupCount(user.id),
   ]);
 
@@ -171,19 +222,25 @@ export async function fetchGitLabDeveloperData(
     );
   }
 
+  // Scale GitLab events → GitHub-comparable commits (see multiplier doc above).
+  const mult = contributionMultiplier();
+  const scaledContribs = Math.round(contribs.lastYear * mult);
+  const scaledAllTime = Math.round(contribs.allTime * mult);
+  const scaledWeek = Math.round(contribs.currentWeek * mult);
+
   return {
     github_login: resolvedLogin,
     github_id: user.id,
     name: user.name,
     avatar_url: user.avatar_url,
     bio: user.bio,
-    contributions: contribs.lastYear,
+    contributions: scaledContribs,
     public_repos: ownProjects.length,
     total_stars: totalStars,
     primary_language: null,
     top_repos: topRepos,
     github_etag: null,
-    contributions_total: contribs.allTime,
+    contributions_total: scaledAllTime,
     contribution_years: [],
     total_prs: 0,
     total_reviews: 0,
@@ -193,10 +250,10 @@ export async function fetchGitLabDeveloperData(
     following: user.following ?? 0,
     organizations_count: groupCount,
     account_created_at: user.created_at ?? null,
-    current_streak: 0,
-    longest_streak: 0,
+    current_streak: contribs.currentStreak,
+    longest_streak: contribs.longestStreak,
     active_days_last_year: contribs.activeDays,
     language_diversity: 0,
-    current_week_contributions: contribs.currentWeek,
+    current_week_contributions: scaledWeek,
   };
 }
