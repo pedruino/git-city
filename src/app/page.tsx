@@ -863,8 +863,9 @@ function HomeContent() {
     }
   }, [searchParams]);
 
-  // Forward ref from localStorage to auth callback URL
-  const handleSignInWithRef = useCallback(async () => {
+  // Forward ref from localStorage to auth callback URL.
+  // Accepts optional provider — defaults to github to keep existing call sites working.
+  const handleSignInWithRef = useCallback(async (provider: "github" | "gitlab" = "github") => {
     trackSignInClicked("city");
     const supabase = createBrowserSupabase();
     let redirectTo = `${window.location.origin}/auth/callback`;
@@ -877,11 +878,14 @@ function HomeContent() {
         }
       }
     } catch { /* ignore */ }
-    await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: { redirectTo },
-    });
+    const options: { redirectTo: string; scopes?: string } = { redirectTo };
+    if (provider === "gitlab") {
+      options.scopes = "openid profile email read_user read_api";
+    }
+    await supabase.auth.signInWithOAuth({ provider, options });
   }, []);
+
+  const gitlabEnabled = process.env.NEXT_PUBLIC_GITLAB_ENABLED === "true";
 
   // Fetch activity feed on mount + poll every 60s
   useEffect(() => {
@@ -3343,7 +3347,7 @@ function HomeContent() {
                   <X size={14} />
                 </button>
               </div>
-              <p className="mb-3 text-xs text-muted normal-case leading-relaxed">Your GitHub commits build a real 3D city. Sign in to claim your building.</p>
+              <p className="mb-3 text-xs text-muted normal-case leading-relaxed">Your commits build a real 3D city. Sign in to claim your building.</p>
               <button
                 onClick={() => { handleSignIn(); setMobileMenuOpen(false); }}
                 className="btn-press w-full py-3 text-xs text-bg"
@@ -3351,6 +3355,15 @@ function HomeContent() {
               >
                 Sign in with GitHub
               </button>
+              {gitlabEnabled && (
+                <button
+                  onClick={() => { handleSignInWithRef("gitlab"); setMobileMenuOpen(false); }}
+                  className="btn-press mt-2 w-full py-3 text-xs text-bg"
+                  style={{ backgroundColor: "#FC6D26", boxShadow: `2px 2px 0 0 ${theme.shadow}` }}
+                >
+                  Sign in with GitLab
+                </button>
+              )}
             </div>
           )}
 
@@ -3939,7 +3952,7 @@ function HomeContent() {
               <div className="hidden sm:flex items-center justify-center gap-2">
                 {!session ? (
                   <button
-                    onClick={handleSignIn}
+                    onClick={() => handleSignIn()}
                     className="btn-press flex items-center gap-1.5 border-[3px] border-border bg-bg/80 px-3 py-1.5 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
                   >
                     <span style={{ color: theme.accent }}>G</span>
@@ -4065,7 +4078,7 @@ function HomeContent() {
           </Link>
           {!session ? (
             <button
-              onClick={handleSignIn}
+              onClick={() => handleSignIn()}
               className="btn-press border-2 border-border px-3 py-1.5 text-[10px] transition-colors active:bg-white/5"
             >
               <span style={{ color: theme.accent }}>G</span>{" "}
