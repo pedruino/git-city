@@ -89,41 +89,54 @@ REVOKE SELECT ON sky_ad_conversion_daily_stats FROM anon, authenticated;
 -- rewriting all function bodies with fully-qualified names.
 -- ============================================================================
 
--- SECURITY DEFINER functions (HIGH risk — run as owner, bypass RLS)
-ALTER FUNCTION assign_new_dev_rank(bigint) SET search_path = 'public';
-ALTER FUNCTION credit_pixels(bigint, bigint, text, text, text, text, text, inet, text) SET search_path = 'public';
-ALTER FUNCTION deactivate_expired_ads() SET search_path = 'public';
-ALTER FUNCTION debit_pixels(bigint, bigint, text, text, text, text) SET search_path = 'public';
-ALTER FUNCTION earn_pixels(bigint, text, text, text, text) SET search_path = 'public';
-ALTER FUNCTION find_auth_user_by_github_login(text) SET search_path = 'public';
-ALTER FUNCTION get_ad_daily_stats(date, date, text[]) SET search_path = 'public';
-ALTER FUNCTION get_ad_stats(date, date, text[]) SET search_path = 'public';
-ALTER FUNCTION get_auth_users_without_developer() SET search_path = 'public';
-ALTER FUNCTION get_endorsements_given_this_month(bigint) SET search_path = 'public';
-ALTER FUNCTION heartbeat_visitor(text) SET search_path = 'public';
-ALTER FUNCTION increment_hired_count(uuid) SET search_path = 'public';
-ALTER FUNCTION increment_job_counter(uuid, text) SET search_path = 'public';
-ALTER FUNCTION increment_kudos_count(bigint) SET search_path = 'public';
-ALTER FUNCTION increment_referral_count(bigint) SET search_path = 'public';
-ALTER FUNCTION increment_visit_count(bigint) SET search_path = 'public';
-ALTER FUNCTION recalculate_ranks() SET search_path = 'public';
-ALTER FUNCTION refresh_sky_ad_stats() SET search_path = 'public';
-ALTER FUNCTION spend_pixels(bigint, text, text, bigint, boolean, inet, text) SET search_path = 'public';
-ALTER FUNCTION upsert_arcade_visit(uuid, uuid) SET search_path = 'public';
-
--- SECURITY INVOKER functions (MEDIUM risk — run as caller, but still best practice)
-ALTER FUNCTION complete_all_dailies(bigint) SET search_path = 'public';
-ALTER FUNCTION count_devs_with_more_achievements(bigint) SET search_path = 'public';
-ALTER FUNCTION grant_streak_freeze(bigint) SET search_path = 'public';
-ALTER FUNCTION grant_xp(bigint, text, integer) SET search_path = 'public';
-ALTER FUNCTION increment_kudos_week(bigint, bigint) SET search_path = 'public';
-ALTER FUNCTION perform_checkin(bigint) SET search_path = 'public';
-ALTER FUNCTION prevent_ledger_mutation() SET search_path = 'public';
-ALTER FUNCTION record_mission_progress(bigint, text, integer, integer) SET search_path = 'public';
-ALTER FUNCTION refresh_weekly_kudos() SET search_path = 'public';
-ALTER FUNCTION top_achievers(integer) SET search_path = 'public';
-ALTER FUNCTION update_arcade_rooms_updated_at() SET search_path = 'public';
-ALTER FUNCTION update_job_updated_at() SET search_path = 'public';
+-- SECURITY DEFINER + SECURITY INVOKER functions
+-- Wrapped in DO block with EXCEPTION handling to skip functions that were
+-- dropped in earlier migrations (e.g. endorsements in 060).
+DO $$
+DECLARE
+  sig TEXT;
+  signatures TEXT[] := ARRAY[
+    'assign_new_dev_rank(bigint)',
+    'credit_pixels(bigint, bigint, text, text, text, text, text, inet, text)',
+    'deactivate_expired_ads()',
+    'debit_pixels(bigint, bigint, text, text, text, text)',
+    'earn_pixels(bigint, text, text, text, text)',
+    'find_auth_user_by_github_login(text)',
+    'get_ad_daily_stats(date, date, text[])',
+    'get_ad_stats(date, date, text[])',
+    'get_auth_users_without_developer()',
+    'heartbeat_visitor(text)',
+    'increment_hired_count(uuid)',
+    'increment_job_counter(uuid, text)',
+    'increment_kudos_count(bigint)',
+    'increment_referral_count(bigint)',
+    'increment_visit_count(bigint)',
+    'recalculate_ranks()',
+    'refresh_sky_ad_stats()',
+    'spend_pixels(bigint, text, text, bigint, boolean, inet, text)',
+    'upsert_arcade_visit(uuid, uuid)',
+    'complete_all_dailies(bigint)',
+    'count_devs_with_more_achievements(bigint)',
+    'grant_streak_freeze(bigint)',
+    'grant_xp(bigint, text, integer)',
+    'increment_kudos_week(bigint, bigint)',
+    'perform_checkin(bigint)',
+    'prevent_ledger_mutation()',
+    'record_mission_progress(bigint, text, integer, integer)',
+    'refresh_weekly_kudos()',
+    'top_achievers(integer)',
+    'update_arcade_rooms_updated_at()',
+    'update_job_updated_at()'
+  ];
+BEGIN
+  FOREACH sig IN ARRAY signatures LOOP
+    BEGIN
+      EXECUTE format('ALTER FUNCTION %s SET search_path = %L', sig, 'public');
+    EXCEPTION WHEN undefined_function THEN
+      RAISE NOTICE 'Skipping ALTER (function not found): %', sig;
+    END;
+  END LOOP;
+END; $$;
 
 
 -- ============================================================================
@@ -136,26 +149,40 @@ ALTER FUNCTION update_job_updated_at() SET search_path = 'public';
 
 -- Must revoke from PUBLIC (not just anon/authenticated) because PostgreSQL
 -- grants EXECUTE to PUBLIC by default on all functions, and named roles inherit it.
-REVOKE EXECUTE ON FUNCTION assign_new_dev_rank(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION credit_pixels(bigint, bigint, text, text, text, text, text, inet, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION deactivate_expired_ads() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION debit_pixels(bigint, bigint, text, text, text, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION earn_pixels(bigint, text, text, text, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION find_auth_user_by_github_login(text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION get_ad_daily_stats(date, date, text[]) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION get_ad_stats(date, date, text[]) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION get_auth_users_without_developer() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION get_endorsements_given_this_month(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION heartbeat_visitor(text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_hired_count(uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_job_counter(uuid, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_kudos_count(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_referral_count(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION increment_visit_count(bigint) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION recalculate_ranks() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION refresh_sky_ad_stats() FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION spend_pixels(bigint, text, text, bigint, boolean, inet, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION upsert_arcade_visit(uuid, uuid) FROM PUBLIC;
+-- Wrapped in DO block with EXCEPTION handling to skip missing functions.
+DO $$
+DECLARE
+  sig TEXT;
+  signatures TEXT[] := ARRAY[
+    'assign_new_dev_rank(bigint)',
+    'credit_pixels(bigint, bigint, text, text, text, text, text, inet, text)',
+    'deactivate_expired_ads()',
+    'debit_pixels(bigint, bigint, text, text, text, text)',
+    'earn_pixels(bigint, text, text, text, text)',
+    'find_auth_user_by_github_login(text)',
+    'get_ad_daily_stats(date, date, text[])',
+    'get_ad_stats(date, date, text[])',
+    'get_auth_users_without_developer()',
+    'heartbeat_visitor(text)',
+    'increment_hired_count(uuid)',
+    'increment_job_counter(uuid, text)',
+    'increment_kudos_count(bigint)',
+    'increment_referral_count(bigint)',
+    'increment_visit_count(bigint)',
+    'recalculate_ranks()',
+    'refresh_sky_ad_stats()',
+    'spend_pixels(bigint, text, text, bigint, boolean, inet, text)',
+    'upsert_arcade_visit(uuid, uuid)'
+  ];
+BEGIN
+  FOREACH sig IN ARRAY signatures LOOP
+    BEGIN
+      EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', sig);
+    EXCEPTION WHEN undefined_function THEN
+      RAISE NOTICE 'Skipping REVOKE (function not found): %', sig;
+    END;
+  END LOOP;
+END; $$;
 
 
 -- ============================================================================

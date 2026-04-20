@@ -1,5 +1,5 @@
 -- Count unique countries for a specific ad
-create or replace function count_ad_countries(p_ad_id uuid)
+create or replace function count_ad_countries(p_ad_id text)
 returns integer
 language sql
 stable

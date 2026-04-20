@@ -2,6 +2,10 @@
 -- Column-level REVOKE doesn't work when table-level SELECT is granted.
 -- Fix: revoke table SELECT, then re-grant only safe columns.
 
+-- Upstream fix: github_etag column was referenced in GRANT below but never
+-- added by any earlier migration (existed only in maintainer's remote DB).
+ALTER TABLE developers ADD COLUMN IF NOT EXISTS github_etag TEXT;
+
 REVOKE SELECT ON developers FROM anon, authenticated;
 
 GRANT SELECT (
