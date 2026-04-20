@@ -124,11 +124,20 @@ async function fetchContributionCounts(username: string): Promise<{
   let currentWeek = 0;
   let activeDays = 0;
 
-  // Sort dates to compute streaks.
-  const dates = Object.keys(calendar).sort();
-  const counts: Array<{ date: string; n: number }> = dates.map((d) => ({ date: d, n: calendar[d] ?? 0 }));
+  // Build a dense day-by-day array for the last 365 days (calendar.json only
+  // contains days with activity; missing days = 0 and must reset the streak).
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days: Array<{ date: string; n: number }> = [];
+  for (let i = 364; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    const n = calendar[iso] ?? 0;
+    days.push({ date: iso, n });
+  }
 
-  for (const { date, n } of counts) {
+  for (const { date, n } of days) {
     if (n > 0) {
       lastYear += n;
       activeDays++;
@@ -136,10 +145,10 @@ async function fetchContributionCounts(username: string): Promise<{
     }
   }
 
-  // Streaks: consecutive days with n > 0 ending today (or yesterday if no commits today yet).
+  // Longest streak: max run of consecutive days with n > 0.
   let longestStreak = 0;
   let run = 0;
-  for (const { n } of counts) {
+  for (const { n } of days) {
     if (n > 0) {
       run++;
       longestStreak = Math.max(longestStreak, run);
@@ -147,12 +156,15 @@ async function fetchContributionCounts(username: string): Promise<{
       run = 0;
     }
   }
+
+  // Current streak: walk backwards from today; if today has 0 but yesterday
+  // has activity, skip today (commits may not have happened yet).
   let currentStreak = 0;
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  for (let i = counts.length - 1; i >= 0; i--) {
-    const { date, n } = counts[i];
-    if (i === counts.length - 1 && n === 0 && (date === today || date === yesterday)) continue;
+  const todayIso = today.toISOString().slice(0, 10);
+  const yesterdayIso = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
+  for (let i = days.length - 1; i >= 0; i--) {
+    const { date, n } = days[i];
+    if (i === days.length - 1 && n === 0 && (date === todayIso || date === yesterdayIso)) continue;
     if (n > 0) currentStreak++;
     else break;
   }

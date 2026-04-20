@@ -2,15 +2,8 @@ import { NextResponse, after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
-import type { TopRepo } from "@/lib/github";
 import { calculateGithubXp } from "@/lib/xp";
-import {
-  ghHeaders,
-  fetchExpandedGitHubData,
-  fetchGitHubDeveloperData,
-  GitHubFetchError,
-  FETCH_TIMEOUT_MS,
-} from "@/lib/github-api";
+import { getActiveProvider, ProviderFetchError } from "@/lib/providers";
 
 // Allow up to 60s on Vercel (Pro plan). Hobby plan max is 10s.
 export const maxDuration = 60;
@@ -106,7 +99,7 @@ export async function GET(
     }
 
     try {
-      const data = await fetchGitHubDeveloperData(username, isOwnProfile ? { allowEmpty: true } : undefined);
+      const data = await getActiveProvider().fetchDeveloperData(username, isOwnProfile ? { allowEmpty: true } : undefined);
       if (rateLimitKey) await recordRateLimitRequest(rateLimitKey);
 
       // Own profile: create building as fallback (auth callback may have failed)
@@ -167,12 +160,12 @@ export async function GET(
         },
       });
     } catch (err) {
-      if (err instanceof GitHubFetchError) {
+      if (err instanceof ProviderFetchError) {
         return NextResponse.json({ error: err.message }, { status: err.status });
       }
       const isTimeout = err instanceof DOMException && err.name === "TimeoutError";
       return NextResponse.json(
-        { error: isTimeout ? "GitHub API timed out. Please try again." : "Failed to fetch GitHub data" },
+        { error: isTimeout ? "Provider API timed out. Please try again." : "Failed to fetch provider data" },
         { status: isTimeout ? 504 : 500 },
       );
     }
@@ -208,120 +201,25 @@ export async function GET(
 
 // ─── Background Refresh ───────────────────────────────────────
 
-type RepoItem = {
-  name: string;
-  stargazers_count: number;
-  language: string | null;
-  html_url: string;
-  fork: boolean;
-  size: number;
-};
-
 async function refreshDeveloper(
   username: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cached: Record<string, any>,
 ) {
   const sb = getSupabaseAdmin();
-  const headers = ghHeaders();
-
-  const userRes = await fetch(
-    `https://api.github.com/users/${encodeURIComponent(username)}`,
-    {
-      headers: {
-        ...headers,
-        ...(cached.github_etag ? { "If-None-Match": String(cached.github_etag) } : {}),
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    },
-  );
-
-  const profileNotModified = userRes.status === 304;
-  if (!profileNotModified && !userRes.ok) return;
-
-  const ghUser = profileNotModified ? null : await userRes.json();
-  if (ghUser?.type === "Organization") return;
-
-  const login = ghUser?.login ?? cached.github_login;
-
-  const [expanded, reposPage1Res] = await Promise.all([
-    fetchExpandedGitHubData(login),
-    fetch(
-      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=1`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
-    ),
-  ]);
-
-  const contributions = expanded?.contributions ?? 0;
-  const publicRepos = ghUser?.public_repos ?? cached.public_repos;
-
-  let repos: RepoItem[] = reposPage1Res.ok ? await reposPage1Res.json() : [];
-
-  if (repos.length >= 100) {
-    const page2Res = await fetch(
-      `https://api.github.com/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=100&page=2`,
-      { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
-    );
-    if (page2Res.ok) {
-      const page2: RepoItem[] = await page2Res.json();
-      repos = repos.concat(page2);
-    }
+  // Delegate fetch to the currently active provider (GitHub or GitLab). The
+  // provider knows its own API shape and how to build a ProviderDeveloperData.
+  let data;
+  try {
+    data = await getActiveProvider().fetchDeveloperData(username);
+  } catch (err) {
+    console.error("refreshDeveloper fetch error:", err);
+    return;
   }
-
-  const ownRepos = repos.filter((r) => !r.fork);
-  const totalStars = ownRepos.reduce((s, r) => s + r.stargazers_count, 0);
-
-  const langCounts: Record<string, number> = {};
-  const uniqueLanguages = new Set<string>();
-  for (const repo of ownRepos) {
-    if (repo.language) {
-      langCounts[repo.language] = (langCounts[repo.language] || 0) + repo.size;
-      uniqueLanguages.add(repo.language);
-    }
-  }
-  const primaryLanguage =
-    Object.entries(langCounts).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null;
-
-  const topRepos: TopRepo[] = ownRepos
-    .sort((a, b) => b.stargazers_count - a.stargazers_count)
-    .slice(0, 5)
-    .map((r) => ({
-      name: r.name,
-      stars: r.stargazers_count,
-      language: r.language,
-      url: r.html_url,
-    }));
 
   const record = {
-    github_login: login.toLowerCase(),
-    github_id: ghUser?.id ?? cached.github_id,
-    name: ghUser?.name ?? cached.name,
-    avatar_url: ghUser?.avatar_url ?? cached.avatar_url,
-    bio: ghUser?.bio ?? cached.bio,
-    contributions,
-    public_repos: publicRepos,
-    total_stars: totalStars,
-    primary_language: primaryLanguage,
-    top_repos: topRepos,
-    github_etag: (profileNotModified ? cached.github_etag : userRes.headers.get("etag")) ?? null,
+    ...data,
     fetched_at: new Date().toISOString(),
-    ...(expanded ? {
-      contributions_total: expanded.contributions_total,
-      contribution_years: expanded.contribution_years,
-      total_prs: expanded.total_prs,
-      total_reviews: expanded.total_reviews,
-      total_issues: expanded.total_issues,
-      repos_contributed_to: expanded.repos_contributed_to,
-      followers: expanded.followers,
-      following: expanded.following,
-      organizations_count: expanded.organizations_count,
-      account_created_at: expanded.account_created_at,
-      current_streak: expanded.current_streak,
-      longest_streak: expanded.longest_streak,
-      active_days_last_year: expanded.active_days_last_year,
-      language_diversity: uniqueLanguages.size,
-      current_week_contributions: expanded.current_week_contributions,
-    } : {}),
   };
 
   const { data: upserted, error: upsertError } = await sb
@@ -338,10 +236,10 @@ async function refreshDeveloper(
   const devId = upserted?.id;
   if (devId) {
     const newGithubXp = calculateGithubXp({
-      contributions: expanded?.contributions_total ?? contributions,
-      total_stars: totalStars,
-      public_repos: publicRepos,
-      total_prs: expanded?.total_prs ?? 0,
+      contributions: data.contributions_total ?? data.contributions,
+      total_stars: data.total_stars,
+      public_repos: data.public_repos,
+      total_prs: data.total_prs ?? 0,
     });
     const prevGithubXp = (cached.xp_github as number) ?? 0;
     if (newGithubXp > prevGithubXp) {
