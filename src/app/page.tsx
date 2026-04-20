@@ -3710,6 +3710,22 @@ function HomeContent() {
                 >
                   Sign in with GitHub
                 </button>
+                {gitlabEnabled && (
+                  <button
+                    onClick={() => {
+                      setWelcomeCtaVisible(false);
+                      localStorage.setItem("gitcity_welcome_seen", "true");
+                      handleSignInWithRef("gitlab");
+                    }}
+                    className="btn-press w-full max-w-60 py-2.5 text-[10px] text-bg"
+                    style={{
+                      backgroundColor: "#FC6D26",
+                      boxShadow: `3px 3px 0 0 ${theme.shadow}`,
+                    }}
+                  >
+                    Sign in with GitLab
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setWelcomeCtaVisible(false);

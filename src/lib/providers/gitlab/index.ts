@@ -10,13 +10,19 @@ export const gitlabProvider: SourceProvider = {
   name: "gitlab",
 
   extractIdentity(userMetadata: Record<string, unknown>): ProviderIdentity | null {
+    console.log("[gitlab.extractIdentity] user_metadata keys:", Object.keys(userMetadata));
+    console.log("[gitlab.extractIdentity] user_metadata:", JSON.stringify(userMetadata, null, 2));
     // Supabase's GitLab provider puts the username in `nickname` or
     // `preferred_username` depending on the GitLab OIDC profile.
-    const login =
+    let login =
       (userMetadata.nickname as string | undefined) ??
       (userMetadata.preferred_username as string | undefined) ??
       (userMetadata.user_name as string | undefined) ??
       null;
+    // Fallback: derive from email local-part (user@gitlab.com → user)
+    if (!login && typeof userMetadata.email === "string") {
+      login = userMetadata.email.split("@")[0];
+    }
     if (!login) return null;
 
     return {
