@@ -289,8 +289,11 @@ export default function RadarMap({
           height={DISPLAY}
           style={{ position: "absolute", inset: 0 }}
         >
-          {/* Camera viewport cone (orbit / explore) */}
-          {!flyMode && sp && (
+          {/* Camera viewport cone (orbit / explore) — skip if any coord is NaN
+              (happens before first camera snapshot). */}
+          {!flyMode && sp && Number.isFinite(camSx) && Number.isFinite(camSy) &&
+            Number.isFinite(lx) && Number.isFinite(ly) &&
+            Number.isFinite(rx) && Number.isFinite(ry) && (
             <g>
               <polygon
                 points={`${camSx},${camSy} ${lx},${ly} ${rx},${ry}`}

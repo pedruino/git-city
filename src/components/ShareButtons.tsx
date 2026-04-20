@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { providerConfig } from "@/lib/auth-config";
 
 interface Props {
   login: string;
@@ -25,12 +26,15 @@ export default function ShareButtons({
   const [cardLang, setCardLang] = useState<CardLang>("en");
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const profileUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/dev/${login}`
-      : `/dev/${login}`;
+  // Avoid SSR/CSR hydration mismatch — start with the relative path both on
+  // the server and the initial client render, then upgrade to the absolute URL
+  // after hydration.
+  const [profileUrl, setProfileUrl] = useState<string>(`/dev/${login}`);
+  useEffect(() => {
+    setProfileUrl(`${window.location.origin}/dev/${login}`);
+  }, [login]);
 
-  const tweetText = `My GitHub just turned into a building. ${contributions.toLocaleString()} contributions, Rank #${rank ?? "?"}. What does yours look like?`;
+  const tweetText = `My ${providerConfig.displayName} just turned into a building. ${contributions.toLocaleString()} contributions, Rank #${rank ?? "?"}. What does yours look like?`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(profileUrl);
