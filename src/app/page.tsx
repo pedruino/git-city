@@ -5308,7 +5308,11 @@ function HomeContent() {
             <span className="text-cream">{theme.name}</span>
             <span className="text-dim">{themeIndex + 1}/{THEMES.length}</span>
           </button>
-          <div id="gc-radio-slot" suppressHydrationWarning />
+          {/* Intentionally no id here — the `gc-radio-slot` portal target is
+              rendered once in the desktop header (~line 2878). Keeping a
+              second element with the same id breaks React hydration because
+              the portal lands on different DOM nodes between SSR and CSR. */}
+          <div className="hidden" aria-hidden />
           <button
             onClick={replayIntro}
             className="btn-press flex items-center gap-1 border-[3px] border-border bg-bg/70 px-2 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
