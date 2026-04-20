@@ -210,9 +210,14 @@ function calcHeightV2(
   const fNorm = Math.log10(Math.max(1, dev.followers ?? 0)) / Math.log10(50_000);
 
   // Consistency: years active / account age
-  const accountAgeYears = Math.max(1,
-    (Date.now() - new Date(dev.account_created_at || dev.created_at).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-  );
+  // Guard against missing account_created_at/created_at (e.g. dev loaded from
+  // a snapshot that didn't include created_at) — Invalid Date → NaN cascade
+  // ending in composite/height being NaN and the building rendering invisible.
+  const createdAtRaw = dev.account_created_at || dev.created_at;
+  const createdAtMs = createdAtRaw ? new Date(createdAtRaw).getTime() : NaN;
+  const accountAgeYears = Number.isFinite(createdAtMs)
+    ? Math.max(1, (Date.now() - createdAtMs) / (365.25 * 24 * 60 * 60 * 1000))
+    : 1;
   const yearsActive = dev.contribution_years?.length || 1;
   const consistencyRaw = (yearsActive / accountAgeYears) * Math.min(1, contribs / (accountAgeYears * 200));
   const consistencyNorm = Math.min(1, consistencyRaw);
