@@ -7,7 +7,7 @@ const GITLAB_TOKEN = process.env.GITLAB_TOKEN;
 const SUPABASE_URL = "https://xwmcwicxcbakstrzdisn.supabase.co";
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GROUP_ID = 125112532;
-const TARGET = 50;
+const TARGET = parseInt(process.env.TARGET ?? "2000", 10);
 const MULTIPLIER = 4;
 
 if (!GITLAB_TOKEN) { console.error("GITLAB_TOKEN not set"); process.exit(1); }

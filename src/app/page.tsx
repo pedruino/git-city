@@ -864,9 +864,12 @@ function HomeContent() {
     }
   }, [searchParams]);
 
-  // Server-side sign-in entry point. Handles provider selection (env), SAML
-  // pre-redirect, and OAuth kickoff. Client just forwards to the route with
-  // the optional referrer param.
+  // Server-side sign-in entry point. When SAML SSO is configured, we can't
+  // redirect the main tab to GitLab's SAML (GitLab rejects external redirect
+  // targets post-SAML, leaving the user stranded on gitlab.com). Instead we
+  // open SAML in a popup, wait for the user to authenticate, detect popup
+  // closure, then redirect the main tab straight into OAuth (which now finds
+  // an active SAML session cookie on gitlab.com).
   const handleSignInWithRef = useCallback(async () => {
     trackSignInClicked("city");
     let refParam = "";
@@ -879,7 +882,28 @@ function HomeContent() {
         }
       }
     } catch { /* ignore */ }
-    window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
+    const continueUrl = `/api/auth/signin?saml_done=1&redirect=${encodeURIComponent("/")}${refParam}`;
+    const samlUrl = process.env.NEXT_PUBLIC_GITLAB_SAML_SSO_URL;
+    if (!samlUrl) {
+      window.location.href = continueUrl;
+      return;
+    }
+    const popup = window.open(
+      samlUrl,
+      "gitlab-saml",
+      "width=900,height=700,menubar=no,toolbar=no,location=yes",
+    );
+    if (!popup) {
+      // Popup blocker → fall back to full-page redirect (the 2-click flow).
+      window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
+      return;
+    }
+    const poll = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(poll);
+        window.location.href = continueUrl;
+      }
+    }, 500);
   }, []);
 
   // Fetch activity feed on mount + poll every 60s
