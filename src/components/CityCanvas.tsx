@@ -18,6 +18,7 @@ import type { RaidPhase } from "@/lib/useRaidSequence";
 import type { RaidExecuteResponse } from "@/lib/raid";
 import FounderSpire from "./FounderSpire";
 import EArcadeLandmark from "./EArcadeLandmark";
+import SoftplanLandmark from "./SoftplanLandmark";
 import { SPONSORS } from "@/lib/sponsors/registry";
 import SponsoredLandmark from "@/lib/sponsors/SponsoredLandmark";
 import WhiteRabbit from "./WhiteRabbit";
@@ -2128,6 +2129,7 @@ interface Props {
   onRaidPhaseComplete?: (phase: RaidPhase) => void;
   onLandmarkClick?: () => void;
   onEArcadeClick?: () => void;
+  onSoftplanClick?: () => void;
   onSponsorClick?: (slug: string) => void;
   sponsorFocusPos?: [number, number, number] | null;
   activeSponsorSlug?: string | null;
@@ -2170,7 +2172,7 @@ function CityExposure({ cityEnergy }: { cityEnergy: number }) {
 // Downtown has no plaza, so district plazas start at index 0
 const RABBIT_PLAZA_INDICES = [0, 1, 3, 6, 9];
 
-export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, onCameraMove }: Props) {
+export default function CityCanvas({ buildings, plazas, decorations, river, bridges, flyMode, flyVehicle, onExitFly, onCollect, themeIndex, onHud, onPause, focusedBuilding, focusedBuildingB, accentColor, onClearFocus, onBuildingClick, onFocusInfo, flyPauseSignal, flyHasOverlay, flyStartPaused, isMobile, onJoystickState, flyBoostActive, flyBrakeActive, skyAds, onAdClick, onAdViewed, introMode, onIntroEnd, raidPhase, raidData, raidAttacker, raidDefender, onRaidPhaseComplete, onLandmarkClick, onEArcadeClick, onSoftplanClick, onSponsorClick, sponsorFocusPos, activeSponsorSlug, rabbitSighting, onRabbitCaught, rabbitCinematic, onRabbitCinematicEnd, rabbitCinematicTarget, ghostPreviewLogin, holdRise, celebrationActive, wallpaperMode, wallpaperSpeed, liveByLogin, cityEnergy, onCompareCinematicEnd, onFlyMove, flyPilotsRef, onCameraMove }: Props) {
   const [isCompareCinematicPlaying, setIsCompareCinematicPlaying] = useState(false);
   const prevComparePairRef = useRef<string>("");
 
@@ -2312,6 +2314,8 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
 
       <Ground key={`ground-${themeIndex}`} color={t.groundColor} grid1={t.grid1} grid2={t.grid2} />
 
+      {/* Generic landmarks disabled — Sapiens Parque mode. FounderSpire kept.
+          Restore others by uncommenting.
       <EArcadeLandmark
         onClick={onEArcadeClick ?? (() => { })}
         themeAccent={t.building.accent}
@@ -2329,7 +2333,14 @@ export default function CityCanvas({ buildings, plazas, decorations, river, brid
           dimmed={!!activeSponsorSlug && activeSponsorSlug !== s.slug}
         />
       ))}
+      */}
       <FounderSpire onClick={onLandmarkClick ?? (() => { })} />
+      <SoftplanLandmark
+        onClick={onSoftplanClick}
+        themeAccent={t.building.accent}
+        themeWindowLit={t.building.windowLit}
+        themeFace={t.building.face}
+      />
 
       {!wallpaperMode && celebrationActive && <CelebrationEffect cityRadius={cityRadius} />}
 

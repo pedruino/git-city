@@ -73,6 +73,7 @@ const RaidOverlay = dynamic(() => import("@/components/RaidOverlay"), { ssr: fal
 const PillModal = dynamic(() => import("@/components/PillModal"), { ssr: false });
 const FounderMessage = dynamic(() => import("@/components/FounderMessage"), { ssr: false });
 const EArcadeCard = dynamic(() => import("@/components/EArcadeCard"), { ssr: false });
+const SoftplanCard = dynamic(() => import("@/components/SoftplanCard"), { ssr: false });
 const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ssr: false });
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
@@ -534,6 +535,7 @@ function HomeContent() {
   const [pillModalOpen, setPillModalOpen] = useState(false);
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
   const [eArcadeOpen, setEArcadeOpen] = useState(false);
+  const [softplanOpen, setSoftplanOpen] = useState(false);
   const [arcadeOnline, setArcadeOnline] = useState<number>(0);
   const [activeSponsor, setActiveSponsor] = useState<string | null>(null);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
@@ -889,22 +891,30 @@ function HomeContent() {
       window.location.href = continueUrl;
       return;
     }
+    // Open with a unique window name so we don't reuse a pre-existing popup
+    // (which would instantly appear "closed" to the poll and skip auth).
+    const popupName = `gitlab-saml-${Date.now()}`;
     const popup = window.open(
       samlUrl,
-      "gitlab-saml",
+      popupName,
       "width=900,height=700,menubar=no,toolbar=no,location=yes",
     );
-    if (!popup) {
-      // Popup blocker → fall back to full-page redirect (the 2-click flow).
+    if (!popup || popup.closed) {
+      // Popup blocked or instantly closed → fall back to full-page redirect.
       window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
       return;
     }
+    const startedAt = Date.now();
     const poll = setInterval(() => {
-      if (popup.closed) {
+      // Require at least 2s open before accepting "closed" as intentional —
+      // guards against browsers that flag cross-origin popups as closed too early.
+      if (popup.closed && Date.now() - startedAt > 2000) {
         clearInterval(poll);
         window.location.href = continueUrl;
       }
     }, 500);
+    // Safety net: if popup stays open >5min, stop polling.
+    setTimeout(() => clearInterval(poll), 5 * 60 * 1000);
   }, []);
 
   // Fetch activity feed on mount + poll every 60s
@@ -2363,6 +2373,7 @@ function HomeContent() {
         onRaidPhaseComplete={raidActions.onPhaseComplete}
         onLandmarkClick={() => { setPillModalOpen(true); setSelectedBuilding(null); }}
         onEArcadeClick={() => { trackEArcadeClicked(); setEArcadeOpen(true); setSelectedBuilding(null); }}
+        onSoftplanClick={() => { setSoftplanOpen(true); setSelectedBuilding(null); }}
         onSponsorClick={(slug) => {
           trackLandmarkClicked(slug);
           const adId = getLandmarkAdId(slug);
@@ -5799,6 +5810,9 @@ function HomeContent() {
           onSignIn={handleSignInWithRef}
         />
       )}
+
+      {/* Softplan landmark card */}
+      {softplanOpen && <SoftplanCard onClose={() => setSoftplanOpen(false)} />}
 
       {/* Sponsored landmark card */}
       {activeSponsor && (() => {

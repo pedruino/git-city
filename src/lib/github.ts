@@ -673,6 +673,8 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   occupiedCells.add("1,-1");
   // FounderSpire: grid(3, 0)
   occupiedCells.add("3,0");
+  // Softplan HQ (Sapiens Parque): grid(-2, 0)
+  occupiedCells.add("-2,0");
   // Sponsored landmarks (dynamic)
   for (const s of SPONSORS) occupiedCells.add(`${s.gridX},${s.gridZ}`);
 
