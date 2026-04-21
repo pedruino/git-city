@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loginFromSupabaseUser } from "@/lib/auth-identity";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import crypto from "crypto";
@@ -12,11 +13,7 @@ async function getAuthenticatedDevId(): Promise<{ devId: number } | { error: str
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated", status: 401 };
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = loginFromSupabaseUser(user);
 
   if (!githubLogin) return { error: "No GitHub login found", status: 400 };
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loginFromSupabaseUser } from "@/lib/auth-identity";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
@@ -34,11 +35,7 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = loginFromSupabaseUser(user);
 
   // Fetch attacker
   const attackerRes = await admin

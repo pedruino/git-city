@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { VOTABLE_ITEM_IDS } from "@/lib/roadmap-data";
+import { loginFromSupabaseUser } from "@/lib/auth-identity";
 
 export async function toggleVote(itemId: string) {
   // Validate item ID against hardcoded list
@@ -21,11 +22,7 @@ export async function toggleVote(itemId: string) {
     throw new Error("Not authenticated");
   }
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = loginFromSupabaseUser(user);
 
   if (!githubLogin) {
     throw new Error("No GitHub login found");

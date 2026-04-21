@@ -4787,12 +4787,12 @@ function HomeContent() {
                       View Profile
                     </Link>
                     <a
-                      href={`https://github.com/${selectedBuilding.login}`}
+                      href={providerConfig.profileUrlFor(selectedBuilding.login)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn-press flex-1 border-2 border-border py-2 text-center text-[10px] text-cream transition-colors hover:border-border-light"
                     >
-                      GitHub
+                      {providerConfig.displayName}
                     </a>
                   </>
                 )}

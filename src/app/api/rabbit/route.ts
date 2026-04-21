@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loginFromSupabaseUser } from "@/lib/auth-identity";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
@@ -26,11 +27,7 @@ export async function POST(request: Request) {
 
   const admin = getSupabaseAdmin();
 
-  const githubLogin = (
-    user.user_metadata.user_name ??
-    user.user_metadata.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = loginFromSupabaseUser(user);
 
   // Fetch developer (must have claimed building)
   const { data: dev } = await admin
@@ -133,11 +130,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ progress: 0, completed: false });
     }
 
-    const githubLogin = (
-      user.user_metadata.user_name ??
-      user.user_metadata.preferred_username ??
-      ""
-    ).toLowerCase();
+    const githubLogin = loginFromSupabaseUser(user);
 
     const { data: dev } = await admin
       .from("developers")
