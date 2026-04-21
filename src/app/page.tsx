@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
-import { providerConfig } from "@/lib/auth-config";
+import { providerConfig, ACTIVE_PROVIDER } from "@/lib/auth-config";
 import { appConfig } from "@/lib/app-config";
 import {
   generateCityLayout,
@@ -536,6 +536,7 @@ function HomeContent() {
   const [founderMessageOpen, setFounderMessageOpen] = useState(false);
   const [eArcadeOpen, setEArcadeOpen] = useState(false);
   const [softplanOpen, setSoftplanOpen] = useState(false);
+  const [gitlabPrivateBannerDismissed, setGitlabPrivateBannerDismissed] = useState(true);
   const [arcadeOnline, setArcadeOnline] = useState<number>(0);
   const [activeSponsor, setActiveSponsor] = useState<string | null>(null);
   const [districtChooserOpen, setDistrictChooserOpen] = useState(false);
@@ -1738,6 +1739,51 @@ function HomeContent() {
       }
     })();
   }, [authLogin, buildings, userParam, stats]);
+
+  // ── On-demand refresh: if the logged-in user's building is older than 24h,
+  // trigger a server-side refresh using their OAuth session token. Fire once
+  // per session; result is a DB update — will show on next page load.
+  const refreshedThisSession = useRef(false);
+  useEffect(() => {
+    if (!authLogin || refreshedThisSession.current || buildings.length === 0) return;
+    const me = buildings.find(b => b.login.toLowerCase() === authLogin);
+    if (!me) return;
+    refreshedThisSession.current = true;
+
+    fetch(`/api/dev/${encodeURIComponent(authLogin)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(dev => {
+        if (!dev?.fetched_at) return;
+        const ageMs = Date.now() - new Date(dev.fetched_at).getTime();
+        if (ageMs < 24 * 60 * 60 * 1000) return;
+        fetch("/api/me/refresh", { method: "POST" }).catch(() => {});
+      })
+      .catch(() => {});
+  }, [authLogin, buildings]);
+
+  // ── GitLab "Include private contributions" banner: calendar.json is the only
+  // source for commit counts, and it's empty unless the user enables this in
+  // their profile settings. Show a dismissible prompt to logged-in GitLab
+  // users whose building has 0 contributions.
+  useEffect(() => {
+    if (ACTIVE_PROVIDER !== "gitlab") return;
+    const dismissed = typeof window !== "undefined"
+      && localStorage.getItem("gitlab_private_banner_dismissed") === "1";
+    setGitlabPrivateBannerDismissed(dismissed);
+  }, []);
+
+  const myBuildingForBanner = authLogin ? buildings.find(b => b.login.toLowerCase() === authLogin) : null;
+  const showGitlabPrivateBanner =
+    ACTIVE_PROVIDER === "gitlab"
+    && !!authLogin
+    && !!myBuildingForBanner
+    && (myBuildingForBanner.contributions ?? 0) === 0
+    && !gitlabPrivateBannerDismissed;
+
+  const dismissGitlabPrivateBanner = () => {
+    setGitlabPrivateBannerDismissed(true);
+    try { localStorage.setItem("gitlab_private_banner_dismissed", "1"); } catch {}
+  };
 
   // Handle ?compare=userA,userB deep link
   const compareParam = searchParams.get("compare");
@@ -5813,6 +5859,69 @@ function HomeContent() {
 
       {/* Softplan landmark card */}
       {softplanOpen && <SoftplanCard onClose={() => setSoftplanOpen(false)} />}
+
+      {/* GitLab: prompt user to expose private contributions in profile. Without
+          this setting enabled, calendar.json returns {} for their login and the
+          building shows 0 contributions. */}
+      {showGitlabPrivateBanner && (
+        <div
+          style={{
+            position: "fixed",
+            top: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 9999,
+            maxWidth: 560,
+            width: "calc(100vw - 32px)",
+            padding: "14px 18px",
+            borderRadius: 12,
+            background: "rgba(20, 22, 30, 0.95)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            backdropFilter: "blur(12px)",
+            color: "#eaeaea",
+            fontSize: 14,
+            lineHeight: 1.5,
+            boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+            display: "flex",
+            gap: 12,
+            alignItems: "flex-start",
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Seu prédio está zerado
+            </div>
+            <div style={{ opacity: 0.85 }}>
+              Ative <b>Include private contributions on my profile</b> nas{" "}
+              <a
+                href="https://gitlab.com/-/user_settings/profile"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#76bc21", textDecoration: "underline" }}
+              >
+                configurações do GitLab
+              </a>{" "}
+              pra expor suas contribuições em repos privados. Depois, faça login de novo.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={dismissGitlabPrivateBanner}
+            aria-label="Fechar"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.6)",
+              cursor: "pointer",
+              fontSize: 18,
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Sponsored landmark card */}
       {activeSponsor && (() => {

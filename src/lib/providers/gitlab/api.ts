@@ -9,22 +9,23 @@ const GITLAB_API_BASE = "https://gitlab.com/api/v4";
 const FETCH_TIMEOUT_MS = 15_000;
 
 /**
- * GitLab counts 1 push = 1 event regardless of commits pushed, while GitHub
- * counts 1 commit = 1 contribution. On average a push has ~3-5 commits, so
- * GitLab contribution counts are artificially lower. This multiplier scales
- * GitLab counts to be comparable with GitHub's range so building heights,
- * rankings, and leaderboards feel right across providers.
- *
- * Configurable via GITLAB_CONTRIBUTION_MULTIPLIER env (default 4).
+ * Optional post-fetch scaling. calendar.json already returns real contribution
+ * counts (same as the profile heatmap), so the default is 1. Override via
+ * GITLAB_CONTRIBUTION_MULTIPLIER only if you need to shift the visual scale.
  */
 function contributionMultiplier(): number {
-  const raw = parseFloat(process.env.GITLAB_CONTRIBUTION_MULTIPLIER ?? "4");
-  return Number.isFinite(raw) && raw > 0 ? raw : 4;
+  const raw = parseFloat(process.env.GITLAB_CONTRIBUTION_MULTIPLIER ?? "1");
+  return Number.isFinite(raw) && raw > 0 ? raw : 1;
 }
 
-function glHeaders(): HeadersInit {
+function glHeaders(accessToken?: string): HeadersInit {
   const h: HeadersInit = { "User-Agent": "git-city-app" };
-  if (process.env.GITLAB_TOKEN) {
+  // Per-call OAuth token (from user's Supabase session) wins over the
+  // server-side master token. Falls back to master for server-initiated calls
+  // with no active user.
+  if (accessToken) {
+    h["Authorization"] = `Bearer ${accessToken}`;
+  } else if (process.env.GITLAB_TOKEN) {
     h["PRIVATE-TOKEN"] = process.env.GITLAB_TOKEN;
   }
   return h;
@@ -60,9 +61,9 @@ interface GitLabEvent {
   action_name: string;
 }
 
-async function glFetch<T>(path: string): Promise<{ data: T; headers: Headers; status: number }> {
+async function glFetch<T>(path: string, accessToken?: string): Promise<{ data: T; headers: Headers; status: number }> {
   const res = await fetch(`${GITLAB_API_BASE}${path}`, {
-    headers: glHeaders(),
+    headers: glHeaders(accessToken),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
@@ -72,18 +73,20 @@ async function glFetch<T>(path: string): Promise<{ data: T; headers: Headers; st
   return { data: (await res.json()) as T, headers: res.headers, status: res.status };
 }
 
-async function findUserByUsername(username: string): Promise<GitLabUser | null> {
+async function findUserByUsername(username: string, accessToken?: string): Promise<GitLabUser | null> {
   const { data } = await glFetch<GitLabUser[]>(
     `/users?username=${encodeURIComponent(username)}`,
+    accessToken,
   );
   return data[0] ?? null;
 }
 
-async function fetchUserProjects(userId: number): Promise<GitLabProject[]> {
+async function fetchUserProjects(userId: number, accessToken?: string): Promise<GitLabProject[]> {
   const all: GitLabProject[] = [];
   for (let page = 1; page <= 2; page++) {
     const { data } = await glFetch<GitLabProject[]>(
       `/users/${userId}/projects?per_page=100&order_by=star_count&sort=desc&page=${page}`,
+      accessToken,
     );
     all.push(...data);
     if (data.length < 100) break;
@@ -179,9 +182,12 @@ async function fetchContributionCounts(username: string): Promise<{
   };
 }
 
-async function fetchGroupCount(userId: number): Promise<number> {
+async function fetchGroupCount(userId: number, accessToken?: string): Promise<number> {
   try {
-    const { data } = await glFetch<unknown[]>(`/users/${userId}/memberships?type=Namespace&per_page=100`);
+    const { data } = await glFetch<unknown[]>(
+      `/users/${userId}/memberships?type=Namespace&per_page=100`,
+      accessToken,
+    );
     return data.length;
   } catch {
     return 0;
@@ -192,15 +198,20 @@ export async function fetchGitLabDeveloperData(
   username: string,
   opts?: FetchOptions,
 ): Promise<ProviderDeveloperData> {
-  const user = await findUserByUsername(username);
+  const accessToken = opts?.accessToken;
+  const user = await findUserByUsername(username, accessToken);
   if (!user) {
     throw new ProviderFetchError("gitlab", "not_found", "User not found on GitLab", 404);
   }
 
   const resolvedLogin = user.username.toLowerCase();
 
+  // calendar.json ignores auth headers entirely (it's a UI endpoint that only
+  // respects session cookies). We don't pass the token — data is public-only,
+  // and the user must enable "Include private contributions on my profile"
+  // in their GitLab settings for private repo activity to show up.
   const [projects, contribs, groupCount] = await Promise.all([
-    fetchUserProjects(user.id).catch(() => [] as GitLabProject[]),
+    fetchUserProjects(user.id, accessToken).catch(() => [] as GitLabProject[]),
     fetchContributionCounts(resolvedLogin).catch(() => ({
       lastYear: 0,
       allTime: 0,
@@ -209,7 +220,7 @@ export async function fetchGitLabDeveloperData(
       currentStreak: 0,
       longestStreak: 0,
     })),
-    fetchGroupCount(user.id),
+    fetchGroupCount(user.id, accessToken),
   ]);
 
   const ownProjects = projects.filter((p) => !p.forked_from_project && !p.archived);

@@ -46,6 +46,12 @@ export interface ProviderDeveloperData {
 
 export interface FetchOptions {
   allowEmpty?: boolean;
+  /**
+   * Per-call OAuth access token. When provided, overrides the server-side
+   * master token (GITLAB_TOKEN / GITHUB_TOKEN) for endpoints that respect
+   * authentication. Used to fetch a user's own data with their session token.
+   */
+  accessToken?: string;
 }
 
 export interface SourceProvider {

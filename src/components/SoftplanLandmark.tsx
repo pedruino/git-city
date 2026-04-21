@@ -61,9 +61,11 @@ const PENT_D = BLOCK_D - 10;
 const PENT_CX = BLOCK_A_CX + 10;
 
 // Lake
-const LAKE_W = 420;
-const LAKE_D = 240;
-const LAKE_CZ = 130;
+// Lake starts just past the grass embankment (which ends at z = ~76) — so the
+// lake's near edge aligns with the grass bottom and never reaches the deck.
+const LAKE_W = 232;   // narrower — 30 units trimmed from each side (east + west)
+const LAKE_D = 200;
+const LAKE_CZ = 176;     // near edge = 176 - 100 = 76 = grass bottom
 
 const TEXTILE_PANELS = 12;
 const SOFTPLAN_GREEN = "#76bc21";
@@ -335,6 +337,8 @@ export default function SoftplanLandmark({
   const windowLit = themeWindowLit.length > 0 ? themeWindowLit : ["#c8dcf0", "#a0c0e0", "#7aa6d0"];
 
   const textileColor = "#d8ccb0";
+  const amber = "#ff9a3c";        // mercadoteca nightlife — warm incandescent
+  const amberSoft = "#ffb873";    // softer gold for string lights
   const accent = SOFTPLAN_GREEN;
 
   // Textures — force light palette regardless of theme
@@ -354,6 +358,29 @@ export default function SoftplanLandmark({
     [],
   );
   const lakeTex = useMemo(() => createLakeTexture(), []);
+
+  // Organic lake outline: rounded corners + subtle curves on long edges so
+  // it doesn't read as a perfect rectangle. Walks the perimeter clockwise.
+  const lakeShape = useMemo(() => {
+    const s = new THREE.Shape();
+    const w = LAKE_W / 2;
+    const d = LAKE_D / 2;
+    const r = 14;
+    s.moveTo(-w + r, -d);
+    // North edge — subtle inward wave
+    s.bezierCurveTo(-w * 0.35, -d + 3, w * 0.35, -d - 3, w - r, -d);
+    s.quadraticCurveTo(w, -d, w, -d + r);         // NE corner
+    // East edge — straight with subtle midpoint dent
+    s.quadraticCurveTo(w - 2, 0, w, d - r);
+    s.quadraticCurveTo(w, d, w - r, d);           // SE corner
+    // South edge — subtle outward curve
+    s.bezierCurveTo(w * 0.35, d + 4, -w * 0.35, d - 2, -w + r, d);
+    s.quadraticCurveTo(-w, d, -w, d - r);         // SW corner
+    // West edge
+    s.quadraticCurveTo(-w + 2, 0, -w, -d + r);
+    s.quadraticCurveTo(-w, -d, -w + r, -d);       // NW corner
+    return s;
+  }, []);
 
   useEffect(() => () => {
     gA_Long.dispose();
@@ -458,7 +485,9 @@ export default function SoftplanLandmark({
   const hd = BLOCK_D / 2;
   const platformW = COMPLEX_W + 60;
   const platformD = BLOCK_D + 50;
-  const deckZ = BAND_CZ + hd + 18;
+  // Deck center: near-edge stays ~3 from building front. Deck is 45 deep
+  // now (half of previous 90), so center = (3 + 45/2) = 25.5 past the front.
+  const deckZ = BAND_CZ + hd + 25.5;
 
   // Sky bridge (bridges the gap between the two blocks at an upper level)
   // Floors: 0=térreo, 1=mesanino, 2=1°, 3=2°, 4=3° (sky bridge here)
@@ -475,15 +504,123 @@ export default function SoftplanLandmark({
         <meshBasicMaterial />
       </mesh>
 
-      {/* ── Lake (south) ── */}
+      {/* ── Lake (south) — rounded + subtly curved shape instead of rectangle ── */}
       <mesh ref={lakeRef} position={[0, 0.2, LAKE_CZ]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[LAKE_W, LAKE_D]} />
+        <shapeGeometry args={[lakeShape]} />
         <meshStandardMaterial
           map={lakeTex} color="#1e5a62" roughness={0.12} metalness={0.92}
           emissive="#0a2228" emissiveIntensity={0.35} transparent opacity={0.95}
         />
       </mesh>
-      <mesh position={[0, 0.6, LAKE_CZ + LAKE_D / 2 + 2]}>
+
+      {/* Grass bank wrapping the lake — east, south, west. Sits at water level
+          and reads as the continuous lime embankment around the pond. Each
+          bank is a tilted slab so it slopes toward the water. Slight curve
+          variations via multiple overlapping segments. */}
+      {(() => {
+        const BANK_W = 14;             // how wide the grass bank extends out
+        const BANK_TOP_Y = 2.4;
+        const BANK_BOT_Y = 0.25;
+        const BANK_LEN = Math.hypot(BANK_W, BANK_TOP_Y - BANK_BOT_Y);
+        const tilt = Math.atan2(BANK_TOP_Y - BANK_BOT_Y, BANK_W);
+        const MID_Y = (BANK_TOP_Y + BANK_BOT_Y) / 2;
+        const halfW = LAKE_W / 2;
+        const halfD = LAKE_D / 2;
+        const grassColor = "#6fb23a";
+
+        return (
+          <>
+            {/* East bank — sloped toward west (lake). Tilt around Z so the
+                outer edge (east) is high and inner (west) is low */}
+            <mesh
+              position={[halfW + BANK_W / 2, MID_Y, LAKE_CZ]}
+              rotation={[0, 0, tilt]}
+            >
+              <boxGeometry args={[BANK_LEN, 0.3, LAKE_D + 4]} />
+              <meshStandardMaterial color={grassColor} roughness={0.95} metalness={0} />
+            </mesh>
+            {/* West bank — mirror of east */}
+            <mesh
+              position={[-(halfW + BANK_W / 2), MID_Y, LAKE_CZ]}
+              rotation={[0, 0, -tilt]}
+            >
+              <boxGeometry args={[BANK_LEN, 0.3, LAKE_D + 4]} />
+              <meshStandardMaterial color={grassColor} roughness={0.95} metalness={0} />
+            </mesh>
+            {/* South bank — sloped toward north (lake). Tilt around X */}
+            <mesh
+              position={[0, MID_Y, LAKE_CZ + halfD + BANK_W / 2]}
+              rotation={[-tilt, 0, 0]}
+            >
+              <boxGeometry args={[LAKE_W + BANK_W * 2 + 8, 0.3, BANK_LEN]} />
+              <meshStandardMaterial color={grassColor} roughness={0.95} metalness={0} />
+            </mesh>
+
+            {/* Vegetation on east bank — trees scattered along the slope */}
+            {Array.from({ length: 7 }, (_, i) => {
+              const t = (i + 0.5) / 7;
+              const wobble = ((i * 13) % 5) - 2;
+              const tx = halfW + 4 + wobble;
+              const tz = LAKE_CZ - halfD + t * LAKE_D;
+              return (
+                <group key={`east-tree-${i}`} position={[tx, 2.0, tz]}>
+                  <mesh position={[0, 4, 0]}>
+                    <cylinderGeometry args={[0.5, 0.7, 8, 6]} />
+                    <meshStandardMaterial color="#5a3a22" roughness={0.9} metalness={0} />
+                  </mesh>
+                  <mesh position={[0, 10, 0]}>
+                    <sphereGeometry args={[4, 8, 6]} />
+                    <meshStandardMaterial color="#2e6f2a" roughness={0.85} metalness={0} />
+                  </mesh>
+                </group>
+              );
+            })}
+
+            {/* Vegetation on south bank — trees along the lake's far edge */}
+            {Array.from({ length: 9 }, (_, i) => {
+              const t = (i + 0.5) / 9;
+              const wobble = ((i * 7) % 5) - 2;
+              const tx = -halfW + t * LAKE_W;
+              const tz = LAKE_CZ + halfD + 6 + wobble;
+              return (
+                <group key={`south-tree-${i}`} position={[tx, 2.0, tz]}>
+                  <mesh position={[0, 4, 0]}>
+                    <cylinderGeometry args={[0.5, 0.7, 8, 6]} />
+                    <meshStandardMaterial color="#5a3a22" roughness={0.9} metalness={0} />
+                  </mesh>
+                  <mesh position={[0, 10, 0]}>
+                    <sphereGeometry args={[4, 8, 6]} />
+                    <meshStandardMaterial color="#2e6f2a" roughness={0.85} metalness={0} />
+                  </mesh>
+                </group>
+              );
+            })}
+
+            {/* Low bushes sprinkled on east + south banks for texture */}
+            {Array.from({ length: 14 }, (_, i) => {
+              const onEast = i < 7;
+              const t = ((i % 7) + 0.5) / 7;
+              const bx = onEast
+                ? halfW + 8 + ((i * 5) % 4 - 2)
+                : -halfW + t * LAKE_W + ((i * 3) % 4 - 2);
+              const bz = onEast
+                ? LAKE_CZ - halfD + t * LAKE_D
+                : LAKE_CZ + halfD + 3 + ((i * 11) % 3);
+              return (
+                <group key={`bush-${i}`} position={[bx, 0.8, bz]}>
+                  <mesh>
+                    <sphereGeometry args={[1.4, 7, 5]} />
+                    <meshStandardMaterial color="#3d7d2a" roughness={0.9} metalness={0} />
+                  </mesh>
+                </group>
+              );
+            })}
+          </>
+        );
+      })()}
+
+      {/* Wooden curb on the deck side (north) of the lake — subtle trim */}
+      <mesh position={[0, 0.6, LAKE_CZ - LAKE_D / 2 - 2]}>
         <boxGeometry args={[LAKE_W, 1.2, 4]} />
         <meshStandardMaterial color="#3c2418" roughness={0.9} metalness={0} />
       </mesh>
@@ -494,17 +631,250 @@ export default function SoftplanLandmark({
         <meshStandardMaterial color={shellColor} roughness={0.55} metalness={0.3} />
       </mesh>
 
-      {/* Deck between blocks and lake */}
-      <mesh position={[0, 2.4, deckZ]}>
-        <boxGeometry args={[COMPLEX_W + 10, 0.6, 34]} />
-        <meshStandardMaterial color="#b5784a" roughness={0.85} metalness={0} />
-      </mesh>
-      <mesh position={[0, 3, deckZ + 17]}>
-        <boxGeometry args={[COMPLEX_W + 10, 0.5, 0.6]} />
-        <meshStandardMaterial
-          color={accent} emissive={accent} emissiveIntensity={0.8} toneMapped={false}
-        />
-      </mesh>
+      {/* Deck between blocks and lake — wood-look promenade with a gentle
+          S-curve (image 6). Brown boards span the whole plaza front. */}
+      {(() => {
+        const DECK_LEN = COMPLEX_W + 60;   // match the base platform width
+        const DECK_SEG_COUNT = 11;
+        const DECK_SEG_W = DECK_LEN / DECK_SEG_COUNT;
+        const DECK_D = 45;                 // 2× original; half of previous oversized try
+        const CURVE_AMP = 4;               // subtle S-curve
+        const EMBANK_W = 10;               // grass slope width from deck to lake
+        const EMBANK_TOP_Z = deckZ + DECK_D / 2;   // top of embankment = deck far edge
+        const EMBANK_BOT_Z = EMBANK_TOP_Z + EMBANK_W;
+
+        const segments = Array.from({ length: DECK_SEG_COUNT }, (_, i) => {
+          const t = i / (DECK_SEG_COUNT - 1);
+          const x = -DECK_LEN / 2 + (i + 0.5) * DECK_SEG_W;
+          const zOffset = Math.sin(t * Math.PI * 2.2) * CURVE_AMP;
+          return { x, zOffset, t };
+        });
+
+        // Lamp post positions scattered along the grass embankment
+        const lampCount = 8;
+        return (
+          <>
+            {/* Grass base under the deck — fills the gaps between the S-curved
+                segments (each segment is at a different Z offset, exposing a
+                void underneath). Sits slightly below deck top so it's visible
+                only through the seams. */}
+            <mesh position={[0, 2.35, deckZ]}>
+              <boxGeometry args={[DECK_LEN, 0.15, DECK_D + 2 * CURVE_AMP + 4]} />
+              <meshStandardMaterial color="#6fb23a" roughness={0.95} metalness={0} />
+            </mesh>
+
+            {/* Wood deck segments (brown). No edge strips — the amber glow
+                lives in the mercadoteca block on the building-side only. */}
+            {segments.map((s, i) => (
+              <mesh key={`deck-seg-${i}`} position={[s.x, 2.4, deckZ + s.zOffset]}>
+                <boxGeometry args={[DECK_SEG_W + 1, 0.6, DECK_D]} />
+                <meshStandardMaterial color="#b5784a" roughness={0.85} metalness={0} />
+              </mesh>
+            ))}
+
+            {/* Grass embankment — sloped tilted box from deck (y=2.4) down to
+                lake level (y=0.2), width 10. Lime green matches the real
+                Sapiens Park turf. */}
+            {(() => {
+              const topY = 2.4;
+              const botY = 0.2;
+              const embankLen = Math.hypot(EMBANK_W, topY - botY);
+              const tilt = Math.atan2(topY - botY, EMBANK_W);
+              return (
+                <mesh
+                  position={[0, (topY + botY) / 2, (EMBANK_TOP_Z + EMBANK_BOT_Z) / 2]}
+                  rotation={[tilt, 0, 0]}
+                >
+                  <boxGeometry args={[DECK_LEN, 0.25, embankLen]} />
+                  <meshStandardMaterial color="#6fb23a" roughness={0.95} metalness={0} />
+                </mesh>
+              );
+            })()}
+
+            {/* Flat grass stripe at the very top of the embankment — blends
+                the deck edge into the slope visually */}
+            <mesh position={[0, 2.35, EMBANK_TOP_Z + 0.4]}>
+              <boxGeometry args={[DECK_LEN, 0.1, 0.8]} />
+              <meshStandardMaterial color="#5ea030" roughness={0.95} metalness={0} />
+            </mesh>
+
+            {/* Lamp posts along the grass — the "pontos de luz no gramado" */}
+            {Array.from({ length: lampCount }, (_, i) => {
+              const lx = -DECK_LEN / 2 + (i + 0.5) * (DECK_LEN / lampCount);
+              // Position on the slope, slightly below top edge
+              const t = 0.35;
+              const ly = 2.4 - t * (2.4 - 0.2);
+              const lz = EMBANK_TOP_Z + t * EMBANK_W;
+              const POST_H = 3.2;
+              return (
+                <group key={`lamp-${i}`} position={[lx, ly, lz]}>
+                  {/* pole */}
+                  <mesh position={[0, POST_H / 2, 0]}>
+                    <cylinderGeometry args={[0.12, 0.15, POST_H, 6]} />
+                    <meshStandardMaterial color="#2a2a2a" roughness={0.7} metalness={0.3} />
+                  </mesh>
+                  {/* lamp head (emissive) */}
+                  <mesh position={[0, POST_H, 0]}>
+                    <sphereGeometry args={[0.45, 7, 6]} />
+                    <meshStandardMaterial
+                      color="#ffcc80" emissive="#ffcc80"
+                      emissiveIntensity={5.0} toneMapped={false}
+                    />
+                  </mesh>
+                  <pointLight
+                    position={[0, POST_H, 0]}
+                    color="#ffb060" intensity={12} distance={22} decay={2}
+                  />
+                </group>
+              );
+            })}
+          </>
+        );
+      })()}
+
+      {/* ── Mercadoteca: warm amber nightlife at the ground floor ──
+           Bars, pizzarias, cervejarias artesanais. The real Softplan HQ at
+           night has linear amber washes under the marquise, glowing planters,
+           and string lights over the waterfront deck (Parque Sapiens). */}
+      {(() => {
+        const hd = BLOCK_D / 2;
+        const FRONT_Z = BAND_CZ + hd + 0.6;   // just outside building front face
+        const AWNING_Y = FLOOR_H * 0.9;        // height of the ground-floor top edge
+        const stringCount = 20;
+
+        // Table clusters — 3 zones of outdoor seating along the deck,
+        // approximating the S-curve + bar patios from images 5 and 6.
+        const tableZones = [
+          { cx: -COMPLEX_W / 2 + 35, count: 4 },
+          { cx: 0,                    count: 5 },
+          { cx:  COMPLEX_W / 2 - 35, count: 4 },
+        ];
+        return (
+          <group userData={{ mercadoteca: true }}>
+            {/* Linear amber strip under the marquise (top of ground floor) —
+                much brighter than before so it participates in bloom */}
+            <mesh position={[0, AWNING_Y, FRONT_Z]}>
+              <boxGeometry args={[COMPLEX_W - 2, 0.6, 0.35]} />
+              <meshStandardMaterial
+                color={amber} emissive={amber} emissiveIntensity={4.5} toneMapped={false}
+              />
+            </mesh>
+
+            {/* Warm point lights spilling out of bars/restaurants along the
+                ground floor — 8 of them for denser coverage */}
+            {Array.from({ length: 8 }, (_, i) => {
+              const x = -COMPLEX_W / 2 + 14 + (i * (COMPLEX_W - 28)) / 7;
+              return (
+                <pointLight
+                  key={`merc-light-${i}`}
+                  position={[x, FLOOR_H * 0.55, FRONT_Z + 3]}
+                  color={amber} intensity={32} distance={70} decay={2}
+                />
+              );
+            })}
+
+            {/* Upward wash lights on the building glass */}
+            {Array.from({ length: 5 }, (_, i) => {
+              const x = -COMPLEX_W / 2 + 25 + (i * (COMPLEX_W - 50)) / 4;
+              return (
+                <pointLight
+                  key={`merc-uplight-${i}`}
+                  position={[x, 1.5, FRONT_Z + 8]}
+                  color={amber} intensity={22} distance={50} decay={2}
+                />
+              );
+            })}
+
+            {/* String lights overhead — larger spheres, brighter, with a
+                subtle sag, spanning building to deck */}
+            {Array.from({ length: stringCount }, (_, i) => {
+              const t = i / (stringCount - 1);
+              const x = -COMPLEX_W / 2 + 8 + t * (COMPLEX_W - 16);
+              const z = FRONT_Z + 10 + Math.sin(t * Math.PI) * 3;
+              const y = 11 - Math.sin(t * Math.PI * 3) * 0.6;  // catenary sag
+              return (
+                <mesh key={`string-${i}`} position={[x, y, z]}>
+                  <sphereGeometry args={[0.5, 6, 5]} />
+                  <meshStandardMaterial
+                    color={amberSoft} emissive={amberSoft}
+                    emissiveIntensity={5.0} toneMapped={false}
+                  />
+                </mesh>
+              );
+            })}
+
+            {/* ─── Outdoor tables + chairs — small cylinders + boxes for
+                pixel-art read. Clustered in 3 seating zones. ─── */}
+            {tableZones.flatMap((zone, zi) =>
+              Array.from({ length: zone.count }, (_, i) => {
+                const offset = (i - (zone.count - 1) / 2) * 5;
+                const wobble = ((zi * 7 + i * 13) % 3) - 1;
+                const tx = zone.cx + offset;
+                const tz = deckZ + wobble * 3;
+                return (
+                  <group key={`table-${zi}-${i}`} position={[tx, 2.9, tz]}>
+                    {/* pedestal */}
+                    <mesh position={[0, 0.7, 0]}>
+                      <cylinderGeometry args={[0.25, 0.3, 1.4, 6]} />
+                      <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0.2} />
+                    </mesh>
+                    {/* table top */}
+                    <mesh position={[0, 1.5, 0]}>
+                      <cylinderGeometry args={[1.3, 1.3, 0.15, 10]} />
+                      <meshStandardMaterial color="#4a3220" roughness={0.7} metalness={0.1} />
+                    </mesh>
+                    {/* tiny candle/lamp on the table — adds bar ambience */}
+                    <mesh position={[0, 1.85, 0]}>
+                      <sphereGeometry args={[0.18, 5, 4]} />
+                      <meshStandardMaterial
+                        color={amberSoft} emissive={amberSoft}
+                        emissiveIntensity={6.0} toneMapped={false}
+                      />
+                    </mesh>
+                    <pointLight
+                      position={[0, 2.1, 0]}
+                      color={amber} intensity={4} distance={7} decay={2}
+                    />
+                    {/* 2-3 chairs around the table — simple stools */}
+                    {[0, Math.PI * 0.67, Math.PI * 1.33].map((ang, ci) => {
+                      if (ci > 0 && ((zi + i + ci) % 3) === 0) return null; // some tables 2 chairs
+                      const cx = Math.cos(ang) * 1.9;
+                      const cz = Math.sin(ang) * 1.9;
+                      return (
+                        <group key={`chair-${ci}`} position={[cx, 0, cz]}>
+                          <mesh position={[0, 0.45, 0]}>
+                            <boxGeometry args={[0.8, 0.9, 0.8]} />
+                            <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0} />
+                          </mesh>
+                          <mesh position={[0, 1.0, -0.3]}>
+                            <boxGeometry args={[0.8, 0.2, 0.2]} />
+                            <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0} />
+                          </mesh>
+                        </group>
+                      );
+                    })}
+                  </group>
+                );
+              }),
+            )}
+
+            {/* Ambient fill lights — raised intensity + 2 extra positions so
+                the whole plaza reads as warm when viewed from any angle */}
+            <pointLight
+              position={[0, 6, deckZ]}
+              color={amber} intensity={45} distance={160} decay={2}
+            />
+            <pointLight
+              position={[-COMPLEX_W / 3, 4, deckZ]}
+              color={amber} intensity={28} distance={110} decay={2}
+            />
+            <pointLight
+              position={[+COMPLEX_W / 3, 4, deckZ]}
+              color={amber} intensity={28} distance={110} decay={2}
+            />
+          </group>
+        );
+      })()}
       {Array.from({ length: 14 }, (_, i) => {
         const x = -COMPLEX_W / 2 + 8 + (i * (COMPLEX_W - 16)) / 13;
         return (
@@ -753,8 +1123,9 @@ export default function SoftplanLandmark({
         [BLOCK_A_CX - BLOCK_A_W / 2 - 76, BAND_CZ + 30],
         [BLOCK_B_CX + BLOCK_B_W / 2 + 22, BAND_CZ - 20],
         [BLOCK_B_CX + BLOCK_B_W / 2 + 26, BAND_CZ + 28],
-        [-80, LAKE_CZ - 50],
-        [80, LAKE_CZ - 40],
+        // Palmeiras na beira do gramado, perto do lago (imagem 8)
+        [-80, 72],
+        [80, 70],
       ].map(([tx, tz], i) => (
         <group key={`tree-${i}`} position={[tx, 0, tz]}>
           <mesh position={[0, 5, 0]}>
