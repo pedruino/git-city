@@ -1,0 +1,46 @@
+name: City Snapshot
+
+# Regenerates the public `snapshot.json` in Supabase Storage that the home page
+# reads on every visit. Replaces the Vercel Cron entry in `vercel.json` when
+# the app is deployed to a host without native cron (Railway, self-hosted, …).
+#
+# Schedule mirrors `vercel.json`: every 10 minutes. GitHub may delay scheduled
+# runs under load; if freshness matters, also configure a Railway Cron Service
+# pointing at the same endpoint.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: city-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger snapshot regeneration
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::APP_URL or CRON_SECRET secret is not set"
+            exit 1
+          fi
+
+          response=$(curl -sS -o /tmp/body.json -w "%{http_code}" \
+            --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/city-snapshot")
+
+          echo "HTTP $response"
+          cat /tmp/body.json
+          echo
+
+          if [ "$response" != "200" ]; then
+            exit 1
+          fi

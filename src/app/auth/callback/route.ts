@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { checkAchievements } from "@/lib/achievements";
@@ -30,6 +30,12 @@ export async function GET(request: Request) {
   const identity = provider.extractIdentity(data.user.user_metadata ?? {});
   const githubLogin = identity?.login ?? "";
 
+  // User's own OAuth access token from the provider (GitLab/GitHub). Supabase
+  // keeps it on the session; we use it in memory during this request only —
+  // never persisted. Enables fetching the user's own data with their scope
+  // instead of a shared master token.
+  const providerToken = data.session?.provider_token ?? undefined;
+
   const admin = getSupabaseAdmin();
 
   if (githubLogin) {
@@ -43,7 +49,10 @@ export async function GET(request: Request) {
     if (!existingDev) {
       // ─── New dev: create building from provider data on login ───
       try {
-        const ghData = await provider.fetchDeveloperData(githubLogin, { allowEmpty: true });
+        const ghData = await provider.fetchDeveloperData(githubLogin, {
+          allowEmpty: true,
+          accessToken: providerToken,
+        });
 
         const { data: created, error: createErr } = await admin
           .from("developers")
@@ -93,28 +102,59 @@ export async function GET(request: Request) {
       } catch (err) {
         console.error("Failed to create dev on login:", err);
       }
-    } else if (!existingDev.claimed) {
-      // ─── Legacy dev: claim existing unclaimed building ───
-      await admin
-        .from("developers")
-        .update({
-          claimed: true,
-          claimed_by: data.user.id,
-          claimed_at: new Date().toISOString(),
-          fetch_priority: 1,
-        })
-        .eq("id", existingDev.id)
-        .eq("claimed", false);
+    } else {
+      // ─── Existing dev: refresh data with their own OAuth token ───
+      // Runs on every login so the building reflects recent activity.
+      // Failures here don't block login — stale data is still usable.
+      try {
+        const ghData = await provider.fetchDeveloperData(githubLogin, {
+          allowEmpty: true,
+          accessToken: providerToken,
+        });
+        const claimFields = existingDev.claimed
+          ? {}
+          : {
+              claimed: true,
+              claimed_by: data.user.id,
+              claimed_at: new Date().toISOString(),
+              fetch_priority: 1,
+            };
+        await admin
+          .from("developers")
+          .update({
+            ...ghData,
+            fetched_at: new Date().toISOString(),
+            ...claimFields,
+          })
+          .eq("id", existingDev.id);
+      } catch (err) {
+        console.error("Failed to refresh dev data on login:", err);
+        // Still claim the building even if fetch failed.
+        if (!existingDev.claimed) {
+          await admin
+            .from("developers")
+            .update({
+              claimed: true,
+              claimed_by: data.user.id,
+              claimed_at: new Date().toISOString(),
+              fetch_priority: 1,
+            })
+            .eq("id", existingDev.id)
+            .eq("claimed", false);
+        }
+      }
 
-      await admin.from("activity_feed").insert({
-        event_type: "dev_joined",
-        actor_id: existingDev.id,
-        metadata: { login: githubLogin },
-      });
+      if (!existingDev.claimed) {
+        await admin.from("activity_feed").insert({
+          event_type: "dev_joined",
+          actor_id: existingDev.id,
+          metadata: { login: githubLogin },
+        });
 
-      cacheEmailFromAuth(existingDev.id, data.user.id).catch(() => {});
-      ensurePreferences(existingDev.id).catch(() => {});
-      sendWelcomeNotification(existingDev.id, githubLogin);
+        cacheEmailFromAuth(existingDev.id, data.user.id).catch(() => {});
+        ensurePreferences(existingDev.id).catch(() => {});
+        sendWelcomeNotification(existingDev.id, githubLogin);
+      }
     }
 
     // Fetch dev record for achievement check + referral processing
@@ -197,6 +237,22 @@ export async function GET(request: Request) {
     } catch {
       // Silently skip v2 features if tables/columns don't exist yet
       console.warn("Auth callback: skipping v2 achievement/referral check (migration may not have run)");
+    }
+
+    // Regenerate the public city snapshot in the background so the new/updated
+    // dev shows up on the home without waiting for the scheduled cron. Only on
+    // platforms without Vercel Cron (Railway, self-hosted) is this load-bearing;
+    // on Vercel the scheduled run still runs every 10 min as a safety net.
+    if (process.env.CRON_SECRET) {
+      after(async () => {
+        try {
+          await fetch(`${origin}/api/cron/city-snapshot`, {
+            headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+          });
+        } catch (err) {
+          console.error("Post-login snapshot refresh failed:", err);
+        }
+      });
     }
   }
 
