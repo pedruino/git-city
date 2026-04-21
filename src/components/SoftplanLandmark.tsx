@@ -65,7 +65,7 @@ const PENT_CX = BLOCK_A_CX + 10;
 // lake's near edge aligns with the grass bottom and never reaches the deck.
 const LAKE_W = 232;   // narrower — 30 units trimmed from each side (east + west)
 const LAKE_D = 200;
-const LAKE_CZ = 176;     // near edge = 176 - 100 = 76 = grass bottom
+const LAKE_CZ = 179;     // near edge = 179 - 100 = 79 = grass bottom (after widening north bank)
 
 const TEXTILE_PANELS = 12;
 const SOFTPLAN_GREEN = "#76bc21";
@@ -556,80 +556,242 @@ export default function SoftplanLandmark({
               <meshStandardMaterial color={grassColor} roughness={0.95} metalness={0} />
             </mesh>
 
-            {/* Vegetation on east bank — trees scattered along the slope */}
-            {Array.from({ length: 7 }, (_, i) => {
-              const t = (i + 0.5) / 7;
-              const wobble = ((i * 13) % 5) - 2;
-              const tx = halfW + 4 + wobble;
-              const tz = LAKE_CZ - halfD + t * LAKE_D;
+            {/* (east/south trees + bushes moved to the dedicated vegetation
+                zones below, at the correct plateau Y level) */}
+          </>
+        );
+      })()}
+
+      {/* (wooden curb removed — blended oddly against night lighting) */}
+
+      {/* Corner fillers — rounded corners of the lake leave a small cutout
+          between the water's edge and the straight banks. Patches sit at
+          water level so they fill ONLY the cutout (lake surface hides the
+          rest of the box). */}
+      {(() => {
+        const r = 14;
+        const halfW = LAKE_W / 2;
+        const halfD = LAKE_D / 2;
+        const corners = [
+          { sx: +1, sz: -1 },  // NE
+          { sx: +1, sz: +1 },  // SE
+          { sx: -1, sz: +1 },  // SW
+          { sx: -1, sz: -1 },  // NW
+        ];
+        return corners.map((c, i) => (
+          <mesh
+            key={`corner-fill-${i}`}
+            position={[
+              c.sx * (halfW - r / 2),
+              0.15,
+              LAKE_CZ + c.sz * (halfD - r / 2),
+            ]}
+          >
+            <boxGeometry args={[r, 0.25, r]} />
+            <meshStandardMaterial color="#5ea030" roughness={0.95} metalness={0} />
+          </mesh>
+        ));
+      })()}
+
+      {/* West walkway only (user kept this). East side is dense vegetation
+          + grass (no walkway). South side untouched from original. */}
+      {(() => {
+        const BANK_W = 14;
+        const WALK_W = 16;
+        const halfW = LAKE_W / 2;
+        const halfD = LAKE_D / 2;
+        const westX = -(halfW + BANK_W + WALK_W / 2);
+        const sideLen = LAKE_D + BANK_W + WALK_W + (LAKE_CZ - halfD - 66);
+        const sideCZ = (66 + LAKE_CZ + halfD + BANK_W + WALK_W) / 2;
+        return (
+          <mesh position={[westX, 2.4, sideCZ]}>
+            <boxGeometry args={[WALK_W, 0.6, sideLen]} />
+            <meshStandardMaterial color="#b5784a" roughness={0.85} metalness={0} />
+          </mesh>
+        );
+      })()}
+
+      {/* East + south vegetation: dense trees + bushes + grass groundcover.
+          East band width = WALK_W (16) to match the west walkway for symmetry.
+          South band is deeper since the lake's south edge runs far from the
+          complex and can host a bigger vegetation zone. */}
+      {(() => {
+        const BANK_W = 14;
+        const VEG_W = 16;                  // matches west walkway width
+        const SOUTH_VEG_D = 32;            // deeper vegetation zone south of lake
+        const halfW = LAKE_W / 2;
+        const halfD = LAKE_D / 2;
+
+        const eastBaseX = halfW + BANK_W + VEG_W / 2;
+        const southBaseZ = LAKE_CZ + halfD + BANK_W + SOUTH_VEG_D / 2;
+
+        const bushColor = (i: number) =>
+          `hsl(${85 + (i * 7) % 25}, 45%, ${30 + (i % 3) * 5}%)`;
+        const treeColor = (i: number) =>
+          `hsl(${95 + (i * 13) % 25}, 55%, ${28 + (i % 4) * 4}%)`;
+
+        // Plateau Y: matches the top of the grass embankment (y=2.4) so the
+        // groundcover sits flush with the walkway / bank top. Trees and
+        // bushes get a small offset above this surface.
+        const PLATEAU_Y = 2.4;
+        const GROUND_Y = PLATEAU_Y + 0.1;      // box center so top at PLATEAU_Y + 0.2
+        const BASE_Y = PLATEAU_Y + 0.15;       // where tree trunks + bushes sit
+
+        return (
+          <>
+            {/* East: grass ground + dense vegetation at plateau level.
+                Extends south to the south vegetation zone to close the
+                corner gap between the two zones. */}
+            {(() => {
+              const eastN = LAKE_CZ - halfD - 2;
+              const eastS = southBaseZ - SOUTH_VEG_D / 2;
+              const eastDepth = eastS - eastN;
+              const eastCZ = (eastN + eastS) / 2;
               return (
-                <group key={`east-tree-${i}`} position={[tx, 2.0, tz]}>
-                  <mesh position={[0, 4, 0]}>
-                    <cylinderGeometry args={[0.5, 0.7, 8, 6]} />
+                <mesh position={[eastBaseX, GROUND_Y, eastCZ]}>
+                  <boxGeometry args={[VEG_W, 0.2, eastDepth]} />
+                  <meshStandardMaterial color="#5ea030" roughness={0.95} metalness={0} />
+                </mesh>
+              );
+            })()}
+            {Array.from({ length: 12 }, (_, i) => {
+              const t = (i + 0.5) / 12;
+              const jitterX = ((i * 17) % 7) - 3;
+              const jitterZ = ((i * 23) % 7) - 3;
+              const tx = eastBaseX + jitterX;
+              const tz = LAKE_CZ - halfD + t * LAKE_D + jitterZ;
+              const trunkH = 7 + ((i * 11) % 4);
+              const leafR = 3.2 + ((i * 7) % 3) * 0.6;
+              return (
+                <group key={`east-tree-${i}`} position={[tx, BASE_Y, tz]}>
+                  <mesh position={[0, trunkH / 2, 0]}>
+                    <cylinderGeometry args={[0.4, 0.6, trunkH, 6]} />
                     <meshStandardMaterial color="#5a3a22" roughness={0.9} metalness={0} />
                   </mesh>
-                  <mesh position={[0, 10, 0]}>
-                    <sphereGeometry args={[4, 8, 6]} />
-                    <meshStandardMaterial color="#2e6f2a" roughness={0.85} metalness={0} />
+                  <mesh position={[0, trunkH + leafR * 0.5, 0]}>
+                    <sphereGeometry args={[leafR, 8, 6]} />
+                    <meshStandardMaterial color={treeColor(i)} roughness={0.85} metalness={0} />
                   </mesh>
                 </group>
               );
             })}
-
-            {/* Vegetation on south bank — trees along the lake's far edge */}
-            {Array.from({ length: 9 }, (_, i) => {
-              const t = (i + 0.5) / 9;
-              const wobble = ((i * 7) % 5) - 2;
-              const tx = -halfW + t * LAKE_W;
-              const tz = LAKE_CZ + halfD + 6 + wobble;
+            {Array.from({ length: 22 }, (_, i) => {
+              const t = (i + 0.5) / 22;
+              const jitterX = ((i * 19) % 7) - 3;
+              const jitterZ = ((i * 13) % 5) - 2;
+              const bx = eastBaseX + jitterX;
+              const bz = LAKE_CZ - halfD + t * LAKE_D + jitterZ;
+              const r = 1.2 + ((i * 5) % 4) * 0.3;
               return (
-                <group key={`south-tree-${i}`} position={[tx, 2.0, tz]}>
-                  <mesh position={[0, 4, 0]}>
-                    <cylinderGeometry args={[0.5, 0.7, 8, 6]} />
+                <mesh key={`east-bush-${i}`} position={[bx, BASE_Y + r * 0.5, bz]}>
+                  <sphereGeometry args={[r, 7, 5]} />
+                  <meshStandardMaterial color={bushColor(i)} roughness={0.9} metalness={0} />
+                </mesh>
+              );
+            })}
+
+            {/* South: larger grass zone + dense tree/bush forest at plateau */}
+            <mesh position={[0, GROUND_Y, southBaseZ]}>
+              <boxGeometry args={[LAKE_W + 2 * BANK_W + 2 * VEG_W, 0.2, SOUTH_VEG_D]} />
+              <meshStandardMaterial color="#5ea030" roughness={0.95} metalness={0} />
+            </mesh>
+            {Array.from({ length: 20 }, (_, i) => {
+              const row = i < 10 ? 0 : 1;
+              const col = i % 10;
+              const rowZ = southBaseZ - SOUTH_VEG_D / 2 + 8 + row * 16;
+              const baseCol = -(LAKE_W + 2 * BANK_W) / 2 + 8 + col * ((LAKE_W + 2 * BANK_W - 16) / 9);
+              const jitterX = ((i * 17) % 7) - 3;
+              const jitterZ = ((i * 23) % 5) - 2;
+              const trunkH = 7 + ((i * 11) % 4);
+              const leafR = 3.2 + ((i * 7) % 3) * 0.6;
+              return (
+                <group key={`south-tree-${i}`} position={[baseCol + jitterX, BASE_Y, rowZ + jitterZ]}>
+                  <mesh position={[0, trunkH / 2, 0]}>
+                    <cylinderGeometry args={[0.4, 0.6, trunkH, 6]} />
                     <meshStandardMaterial color="#5a3a22" roughness={0.9} metalness={0} />
                   </mesh>
-                  <mesh position={[0, 10, 0]}>
-                    <sphereGeometry args={[4, 8, 6]} />
-                    <meshStandardMaterial color="#2e6f2a" roughness={0.85} metalness={0} />
+                  <mesh position={[0, trunkH + leafR * 0.5, 0]}>
+                    <sphereGeometry args={[leafR, 8, 6]} />
+                    <meshStandardMaterial color={treeColor(i + 100)} roughness={0.85} metalness={0} />
                   </mesh>
                 </group>
               );
             })}
-
-            {/* Low bushes sprinkled on east + south banks for texture */}
-            {Array.from({ length: 14 }, (_, i) => {
-              const onEast = i < 7;
-              const t = ((i % 7) + 0.5) / 7;
-              const bx = onEast
-                ? halfW + 8 + ((i * 5) % 4 - 2)
-                : -halfW + t * LAKE_W + ((i * 3) % 4 - 2);
-              const bz = onEast
-                ? LAKE_CZ - halfD + t * LAKE_D
-                : LAKE_CZ + halfD + 3 + ((i * 11) % 3);
+            {Array.from({ length: 30 }, (_, i) => {
+              const t = (i + 0.5) / 30;
+              const bx = -(LAKE_W + 2 * BANK_W) / 2 + 4 + t * (LAKE_W + 2 * BANK_W - 8);
+              const rowZ = southBaseZ + ((i * 7) % SOUTH_VEG_D - SOUTH_VEG_D / 2) * 0.8;
+              const r = 1.2 + ((i * 5) % 4) * 0.3;
               return (
-                <group key={`bush-${i}`} position={[bx, 0.8, bz]}>
-                  <mesh>
-                    <sphereGeometry args={[1.4, 7, 5]} />
-                    <meshStandardMaterial color="#3d7d2a" roughness={0.9} metalness={0} />
-                  </mesh>
-                </group>
+                <mesh key={`south-bush-${i}`} position={[bx, BASE_Y + r * 0.5, rowZ]}>
+                  <sphereGeometry args={[r, 7, 5]} />
+                  <meshStandardMaterial color={bushColor(i + 200)} roughness={0.9} metalness={0} />
+                </mesh>
               );
             })}
           </>
         );
       })()}
 
-      {/* Wooden curb on the deck side (north) of the lake — subtle trim */}
-      <mesh position={[0, 0.6, LAKE_CZ - LAKE_D / 2 - 2]}>
-        <boxGeometry args={[LAKE_W, 1.2, 4]} />
-        <meshStandardMaterial color="#3c2418" roughness={0.9} metalness={0} />
-      </mesh>
-
       {/* Base platform under the whole complex */}
       <mesh position={[0, 1.5, BAND_CZ]}>
         <boxGeometry args={[platformW, 3, platformD]} />
         <meshStandardMaterial color={shellColor} roughness={0.55} metalness={0.3} />
       </mesh>
+
+      {/* Round cafe tables + chairs on the platform strip between the
+          building facade (z = BAND_CZ + hd = 18) and the brown deck — the
+          visible "blue plaza" at platform top (y = 3). Two staggered rows
+          so the line reads as organic seating, not a grid. */}
+      {(() => {
+        const PLATFORM_TOP_Y = 3;
+        const Z_NEAR = BAND_CZ + BLOCK_D / 2 + 4;   // closer to building
+        const Z_FAR = BAND_CZ + BLOCK_D / 2 + 18;   // just before deck edge
+        const COLUMNS = 11;
+        const X_SPAN = COMPLEX_W - 32;
+
+        return Array.from({ length: COLUMNS * 2 }, (_, idx) => {
+          const row = idx % 2;
+          const col = Math.floor(idx / 2);
+          const t = (col + (row === 0 ? 0.25 : 0.75)) / COLUMNS;
+          const tx = -X_SPAN / 2 + t * X_SPAN;
+          const jitter = ((col * 13 + row * 7) % 5) - 2;
+          const tz = (row === 0 ? Z_NEAR : Z_FAR) + jitter * 0.4;
+
+          return (
+            <group key={`plaza-table-${idx}`} position={[tx, PLATFORM_TOP_Y, tz]}>
+              {/* pedestal */}
+              <mesh position={[0, 0.85, 0]}>
+                <cylinderGeometry args={[0.28, 0.38, 1.7, 6]} />
+                <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0.2} />
+              </mesh>
+              {/* round wooden top */}
+              <mesh position={[0, 1.85, 0]}>
+                <cylinderGeometry args={[1.5, 1.5, 0.18, 14]} />
+                <meshStandardMaterial color="#8a5a34" roughness={0.7} metalness={0.1} />
+              </mesh>
+              {/* chairs — 3 around each table, rotated so the pattern varies */}
+              {Array.from({ length: 3 }, (_, ci) => {
+                const ang = (ci / 3) * Math.PI * 2 + (idx * 0.4);
+                const cxp = Math.cos(ang) * 2.3;
+                const czp = Math.sin(ang) * 2.3;
+                return (
+                  <group key={`chair-${ci}`} position={[cxp, 0, czp]} rotation={[0, -ang + Math.PI / 2, 0]}>
+                    <mesh position={[0, 0.5, 0]}>
+                      <boxGeometry args={[0.9, 1.0, 0.9]} />
+                      <meshStandardMaterial color="#3a2a1e" roughness={0.8} metalness={0} />
+                    </mesh>
+                    <mesh position={[0, 1.15, -0.4]}>
+                      <boxGeometry args={[0.9, 0.3, 0.2]} />
+                      <meshStandardMaterial color="#3a2a1e" roughness={0.8} metalness={0} />
+                    </mesh>
+                  </group>
+                );
+              })}
+            </group>
+          );
+        });
+      })()}
 
       {/* Deck between blocks and lake — wood-look promenade with a gentle
           S-curve (image 6). Brown boards span the whole plaza front. */}
@@ -639,7 +801,7 @@ export default function SoftplanLandmark({
         const DECK_SEG_W = DECK_LEN / DECK_SEG_COUNT;
         const DECK_D = 45;                 // 2× original; half of previous oversized try
         const CURVE_AMP = 4;               // subtle S-curve
-        const EMBANK_W = 10;               // grass slope width from deck to lake
+        const EMBANK_W = 13;               // grass slope width from deck to lake (+1/3 wider)
         const EMBANK_TOP_Z = deckZ + DECK_D / 2;   // top of embankment = deck far edge
         const EMBANK_BOT_Z = EMBANK_TOP_Z + EMBANK_W;
 
@@ -742,64 +904,53 @@ export default function SoftplanLandmark({
         const AWNING_Y = FLOOR_H * 0.9;        // height of the ground-floor top edge
         const stringCount = 20;
 
-        // Table clusters — 3 zones of outdoor seating along the deck,
-        // approximating the S-curve + bar patios from images 5 and 6.
+        // Table clusters — 5 zones across the full deck width, denser.
         const tableZones = [
-          { cx: -COMPLEX_W / 2 + 35, count: 4 },
-          { cx: 0,                    count: 5 },
-          { cx:  COMPLEX_W / 2 - 35, count: 4 },
+          { cx: -COMPLEX_W / 2 + 24, count: 6 },
+          { cx: -COMPLEX_W / 2 + 70, count: 5 },
+          { cx: 0,                    count: 7 },
+          { cx:  COMPLEX_W / 2 - 70, count: 5 },
+          { cx:  COMPLEX_W / 2 - 24, count: 6 },
         ];
         return (
           <group userData={{ mercadoteca: true }}>
-            {/* Linear amber strip under the marquise (top of ground floor) —
-                much brighter than before so it participates in bloom */}
-            <mesh position={[0, AWNING_Y, FRONT_Z]}>
-              <boxGeometry args={[COMPLEX_W - 2, 0.6, 0.35]} />
-              <meshStandardMaterial
-                color={amber} emissive={amber} emissiveIntensity={4.5} toneMapped={false}
-              />
-            </mesh>
+            {/* (awning strip removed — it read as an out-of-place yellow bar) */}
 
-            {/* Warm point lights spilling out of bars/restaurants along the
-                ground floor — 8 of them for denser coverage */}
-            {Array.from({ length: 8 }, (_, i) => {
-              const x = -COMPLEX_W / 2 + 14 + (i * (COMPLEX_W - 28)) / 7;
-              return (
-                <pointLight
-                  key={`merc-light-${i}`}
-                  position={[x, FLOOR_H * 0.55, FRONT_Z + 3]}
-                  color={amber} intensity={32} distance={70} decay={2}
-                />
-              );
-            })}
+            {/* (floating pointlights removed — the sconces below provide the
+                amber lighting without rendering as orphan bright points) */}
 
-            {/* Upward wash lights on the building glass */}
-            {Array.from({ length: 5 }, (_, i) => {
-              const x = -COMPLEX_W / 2 + 25 + (i * (COMPLEX_W - 50)) / 4;
-              return (
-                <pointLight
-                  key={`merc-uplight-${i}`}
-                  position={[x, 1.5, FRONT_Z + 8]}
-                  color={amber} intensity={22} distance={50} decay={2}
-                />
-              );
-            })}
-
-            {/* String lights overhead — larger spheres, brighter, with a
-                subtle sag, spanning building to deck */}
+            {/* Wall-mounted amber sconces along the building's south face —
+                fixed to the facade at ground-floor ceiling level. Each has a
+                small bracket + glowing bulb + halo pointLight. */}
             {Array.from({ length: stringCount }, (_, i) => {
-              const t = i / (stringCount - 1);
-              const x = -COMPLEX_W / 2 + 8 + t * (COMPLEX_W - 16);
-              const z = FRONT_Z + 10 + Math.sin(t * Math.PI) * 3;
-              const y = 11 - Math.sin(t * Math.PI * 3) * 0.6;  // catenary sag
+              const x = -COMPLEX_W / 2 + 8 + (i * (COMPLEX_W - 16)) / (stringCount - 1);
+              const y = FLOOR_H * 0.78;
+              // Skip sconces that fall in the gap between the two blocks —
+              // no wall to attach to, they'd render as floating bulbs.
+              const gapMinX = BLOCK_A_CX + BLOCK_A_W / 2;
+              const gapMaxX = BLOCK_B_CX - BLOCK_B_W / 2;
+              if (x > gapMinX && x < gapMaxX) return null;
               return (
-                <mesh key={`string-${i}`} position={[x, y, z]}>
-                  <sphereGeometry args={[0.5, 6, 5]} />
-                  <meshStandardMaterial
-                    color={amberSoft} emissive={amberSoft}
-                    emissiveIntensity={5.0} toneMapped={false}
+                <group key={`sconce-${i}`} position={[x, y, FRONT_Z]}>
+                  {/* Bracket (dark stub attaching to the wall) */}
+                  <mesh position={[0, 0, 0.35]}>
+                    <boxGeometry args={[0.2, 0.2, 0.7]} />
+                    <meshStandardMaterial color="#222" roughness={0.7} metalness={0.4} />
+                  </mesh>
+                  {/* Glowing amber bulb */}
+                  <mesh position={[0, 0, 0.8]}>
+                    <sphereGeometry args={[0.45, 6, 5]} />
+                    <meshStandardMaterial
+                      color={amber} emissive={amber}
+                      emissiveIntensity={6.0} toneMapped={false}
+                    />
+                  </mesh>
+                  {/* Wash light projecting onto the deck */}
+                  <pointLight
+                    position={[0, -0.3, 1.2]}
+                    color={amber} intensity={16} distance={30} decay={2}
                   />
-                </mesh>
+                </group>
               );
             })}
 
@@ -807,48 +958,48 @@ export default function SoftplanLandmark({
                 pixel-art read. Clustered in 3 seating zones. ─── */}
             {tableZones.flatMap((zone, zi) =>
               Array.from({ length: zone.count }, (_, i) => {
-                const offset = (i - (zone.count - 1) / 2) * 5;
+                const offset = (i - (zone.count - 1) / 2) * 8;
                 const wobble = ((zi * 7 + i * 13) % 3) - 1;
                 const tx = zone.cx + offset;
-                const tz = deckZ + wobble * 3;
+                const tz = deckZ + wobble * 6;
                 return (
-                  <group key={`table-${zi}-${i}`} position={[tx, 2.9, tz]}>
+                  <group key={`table-${zi}-${i}`} position={[tx, 2.7, tz]}>
                     {/* pedestal */}
-                    <mesh position={[0, 0.7, 0]}>
-                      <cylinderGeometry args={[0.25, 0.3, 1.4, 6]} />
+                    <mesh position={[0, 1.1, 0]}>
+                      <cylinderGeometry args={[0.35, 0.45, 2.2, 6]} />
                       <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0.2} />
                     </mesh>
-                    {/* table top */}
-                    <mesh position={[0, 1.5, 0]}>
-                      <cylinderGeometry args={[1.3, 1.3, 0.15, 10]} />
-                      <meshStandardMaterial color="#4a3220" roughness={0.7} metalness={0.1} />
+                    {/* round table top — lighter wood + bigger for visibility */}
+                    <mesh position={[0, 2.3, 0]}>
+                      <cylinderGeometry args={[2.0, 2.0, 0.25, 12]} />
+                      <meshStandardMaterial color="#8a5a34" roughness={0.7} metalness={0.1} />
                     </mesh>
-                    {/* tiny candle/lamp on the table — adds bar ambience */}
-                    <mesh position={[0, 1.85, 0]}>
-                      <sphereGeometry args={[0.18, 5, 4]} />
+                    {/* candle/lamp on the table */}
+                    <mesh position={[0, 2.75, 0]}>
+                      <sphereGeometry args={[0.35, 6, 5]} />
                       <meshStandardMaterial
                         color={amberSoft} emissive={amberSoft}
                         emissiveIntensity={6.0} toneMapped={false}
                       />
                     </mesh>
                     <pointLight
-                      position={[0, 2.1, 0]}
-                      color={amber} intensity={4} distance={7} decay={2}
+                      position={[0, 3, 0]}
+                      color={amber} intensity={6} distance={10} decay={2}
                     />
-                    {/* 2-3 chairs around the table — simple stools */}
+                    {/* 2-3 chairs around the table — bigger, lighter for contrast */}
                     {[0, Math.PI * 0.67, Math.PI * 1.33].map((ang, ci) => {
-                      if (ci > 0 && ((zi + i + ci) % 3) === 0) return null; // some tables 2 chairs
-                      const cx = Math.cos(ang) * 1.9;
-                      const cz = Math.sin(ang) * 1.9;
+                      if (ci > 0 && ((zi + i + ci) % 3) === 0) return null;
+                      const cx = Math.cos(ang) * 3.0;
+                      const cz = Math.sin(ang) * 3.0;
                       return (
                         <group key={`chair-${ci}`} position={[cx, 0, cz]}>
-                          <mesh position={[0, 0.45, 0]}>
-                            <boxGeometry args={[0.8, 0.9, 0.8]} />
-                            <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0} />
+                          <mesh position={[0, 0.7, 0]}>
+                            <boxGeometry args={[1.2, 1.4, 1.2]} />
+                            <meshStandardMaterial color="#3a2a1e" roughness={0.8} metalness={0} />
                           </mesh>
-                          <mesh position={[0, 1.0, -0.3]}>
-                            <boxGeometry args={[0.8, 0.2, 0.2]} />
-                            <meshStandardMaterial color="#2a2018" roughness={0.8} metalness={0} />
+                          <mesh position={[0, 1.6, -0.5]}>
+                            <boxGeometry args={[1.2, 0.4, 0.3]} />
+                            <meshStandardMaterial color="#3a2a1e" roughness={0.8} metalness={0} />
                           </mesh>
                         </group>
                       );

@@ -389,7 +389,7 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
   buildings: CityBuilding[];
   plazas: CityPlaza[];
   decorations: CityDecoration[];
-  river: CityRiver;
+  river: CityRiver | null;
   bridges: CityBridge[];
   districtZones: DistrictZone[];
 } {
@@ -773,31 +773,9 @@ export function generateCityLayout(devs: DeveloperRecord[]): {
     });
   }
 
-  // ── River ──
-  const riverCenterZ = RIVER_Z_THRESHOLD + RIVER_PUSH / 2 + STREET_W / 2;
-  let bMinX = 0, bMaxX = 0;
-  for (const b of buildings) {
-    if (b.position[0] < bMinX) bMinX = b.position[0];
-    if (b.position[0] > bMaxX) bMaxX = b.position[0];
-  }
-  const riverPadding = 80;
-  const riverXExtent = (bMaxX - bMinX) + riverPadding * 2;
-  const riverCenterX = (bMinX + bMaxX) / 2;
-  const river: CityRiver = {
-    x: riverCenterX - riverXExtent / 2,
-    width: riverXExtent,
-    length: RIVER_WIDTH,
-    centerZ: riverCenterZ,
-  };
-
-  // ── Bridges ──
-  const bridgeWidth = RIVER_WIDTH + 20;
-  const bridgeSpacing = riverXExtent / 4;
-  const bridges: CityBridge[] = [
-    { position: [riverCenterX, 0, riverCenterZ], width: bridgeWidth, rotation: Math.PI / 2 },
-    { position: [riverCenterX + bridgeSpacing, 0, riverCenterZ], width: bridgeWidth, rotation: Math.PI / 2 },
-    { position: [riverCenterX - bridgeSpacing, 0, riverCenterZ], width: bridgeWidth, rotation: Math.PI / 2 },
-  ];
+  // ── River + Bridges + Waterfront disabled ──
+  const river: CityRiver | null = null;
+  const bridges: CityBridge[] = [];
 
   return { buildings, plazas, decorations, river, bridges, districtZones };
 }
