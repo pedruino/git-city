@@ -34,7 +34,7 @@ const ROUTE_LIMITS: [string, number, number][] = [
   ["/api/city", 30, 60_000],
   ["/api/dev/", 60, 60_000],
   ["/api/items", 30, 60_000],
-  ["/api/auth", 10, 60_000],
+  ["/api/auth", 60, 60_000],
 ];
 
 // Read-only routes that work without session refresh.

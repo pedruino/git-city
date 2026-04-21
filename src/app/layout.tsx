@@ -97,8 +97,12 @@ export default function RootLayout({
       <body className="bg-bg font-pixel text-warm" suppressHydrationWarning>
         {children}
         <GlobalRadio />
-        <Analytics />
-        <SpeedInsights />
+        {process.env.VERCEL === "1" && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
         {process.env.NEXT_PUBLIC_HIMETRICA_API_KEY && (
           <>
             <Script
