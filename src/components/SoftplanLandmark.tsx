@@ -12,16 +12,19 @@ import * as THREE from "three";
 // between floors, textile second skin facing the lake, a dark rooftop
 // penthouse with the "softplan" sign, and a large "SOFTPLAN" 3D
 // wordmark at the ground-floor entrance.
-const BLOCK_W = 96;    // matches PrimaveraLandmark footprint
+// Asymmetric towers — east block is larger (matches the real Softplan HQ).
+// West was trimmed by 1/3 and the volume moved to the east block.
+const BLOCK_A_W = 64;                            // west block width
+const BLOCK_B_W = 128;                           // east block width (2× the west)
 const BLOCK_D = 76;
 const BLOCK_H = 82;
 const FLOORS = 5;
 const FLOOR_H = BLOCK_H / FLOORS;
 
 const GAP = 40;                                  // sky bridge span
-const BLOCK_A_CX = -BLOCK_W / 2 - GAP / 2;       // west block
-const BLOCK_B_CX = +BLOCK_W / 2 + GAP / 2;       // east block
-const COMPLEX_W = 2 * BLOCK_W + GAP;             // 232
+const COMPLEX_W = BLOCK_A_W + GAP + BLOCK_B_W;   // 232 (total unchanged)
+const BLOCK_A_CX = -COMPLEX_W / 2 + BLOCK_A_W / 2;
+const BLOCK_B_CX = +COMPLEX_W / 2 - BLOCK_B_W / 2;
 
 const BAND_CZ = -20;                              // building centerline
 
@@ -205,6 +208,7 @@ function createLakeTexture(): THREE.CanvasTexture {
 
 interface BlockProps {
   cx: number;
+  w: number;
   glassLong: THREE.Texture;
   glassShort: THREE.Texture;
   shellColor: string;
@@ -212,8 +216,8 @@ interface BlockProps {
   accent: string;
 }
 
-function GlassBlock({ cx, glassLong, glassShort, shellColor, emColor, accent }: BlockProps) {
-  const hw = BLOCK_W / 2;
+function GlassBlock({ cx, w, glassLong, glassShort, shellColor, emColor, accent }: BlockProps) {
+  const hw = w / 2;
   const hd = BLOCK_D / 2;
   const yc = BLOCK_H / 2 + 3;
 
@@ -221,20 +225,20 @@ function GlassBlock({ cx, glassLong, glassShort, shellColor, emColor, accent }: 
     <group position={[cx, 0, BAND_CZ]}>
       {/* Dark steel shell (nearly swallowed by glass) */}
       <mesh position={[0, yc, 0]}>
-        <boxGeometry args={[BLOCK_W, BLOCK_H, BLOCK_D]} />
+        <boxGeometry args={[w, BLOCK_H, BLOCK_D]} />
         <meshStandardMaterial color={shellColor} roughness={0.3} metalness={0.75} />
       </mesh>
 
       {/* Long facades (south + north) — transparent glass */}
       <mesh position={[0, yc, hd + 0.4]}>
-        <planeGeometry args={[BLOCK_W - 2, BLOCK_H - 2]} />
+        <planeGeometry args={[w - 2, BLOCK_H - 2]} />
         <meshStandardMaterial
           map={glassLong} emissive={emColor} emissiveMap={glassLong}
           emissiveIntensity={0.7} toneMapped={false} transparent opacity={0.85}
         />
       </mesh>
       <mesh position={[0, yc, -hd - 0.4]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[BLOCK_W - 2, BLOCK_H - 2]} />
+        <planeGeometry args={[w - 2, BLOCK_H - 2]} />
         <meshStandardMaterial
           map={glassLong} emissive={emColor} emissiveMap={glassLong}
           emissiveIntensity={0.7} toneMapped={false} transparent opacity={0.85}
@@ -260,16 +264,16 @@ function GlassBlock({ cx, glassLong, glassShort, shellColor, emColor, accent }: 
       {/* Floor slabs (dark, protrude slightly) */}
       {Array.from({ length: FLOORS }, (_, i) => (
         <mesh key={`slab-${i}`} position={[0, 3 + (i + 1) * FLOOR_H, 0]}>
-          <boxGeometry args={[BLOCK_W + 2, 0.9, BLOCK_D + 2]} />
+          <boxGeometry args={[w + 2, 0.9, BLOCK_D + 2]} />
           <meshStandardMaterial color={shellColor} roughness={0.45} metalness={0.55} />
         </mesh>
       ))}
 
-      {/* Subtle coral hints at each floor parapet (barely visible — matches real facade) */}
+      {/* Subtle coral hints at each floor parapet */}
       {[hd + 0.5, -hd - 0.5].map((zFace, f) =>
         Array.from({ length: FLOORS }, (_, i) => (
           <mesh key={`stripe-${f}-${i}`} position={[0, 3 + (i + 1) * FLOOR_H - FLOOR_H * 0.08, zFace]}>
-            <boxGeometry args={[BLOCK_W + 0.6, FLOOR_H * 0.06, 0.3]} />
+            <boxGeometry args={[w + 0.6, FLOOR_H * 0.06, 0.3]} />
             <meshStandardMaterial
               color={ORANGE_ACCENT} emissive={ORANGE_ACCENT} emissiveIntensity={0.25}
               toneMapped={false} transparent opacity={0.6}
@@ -280,7 +284,7 @@ function GlassBlock({ cx, glassLong, glassShort, shellColor, emColor, accent }: 
 
       {/* Green accent trim at top */}
       <mesh position={[0, BLOCK_H + 3, 0]}>
-        <boxGeometry args={[BLOCK_W + 3, 0.8, BLOCK_D + 3]} />
+        <boxGeometry args={[w + 3, 0.8, BLOCK_D + 3]} />
         <meshStandardMaterial
           color={accent} emissive={accent} emissiveIntensity={1.2} toneMapped={false}
         />
@@ -460,6 +464,8 @@ export default function SoftplanLandmark({
   // Floors: 0=térreo, 1=mesanino, 2=1°, 3=2°, 4=3° (sky bridge here)
   const bridgeY = 3 + FLOOR_H * 4.5;
   const bridgeSpan = GAP + 4;
+  // Gap midpoint shifts since the blocks are now asymmetric
+  const bridgeCX = (BLOCK_A_CX + BLOCK_A_W / 2 + BLOCK_B_CX - BLOCK_B_W / 2) / 2;
 
   return (
     <group ref={groupRef} position={position} userData={{ isLandmark: true }}>
@@ -515,22 +521,22 @@ export default function SoftplanLandmark({
         );
       })}
 
-      {/* ── Two glass blocks ── */}
+      {/* ── Two glass blocks (west = smaller, east = larger) ── */}
       <GlassBlock
-        cx={BLOCK_A_CX} glassLong={gA_Long} glassShort={gA_Short}
+        cx={BLOCK_A_CX} w={BLOCK_A_W} glassLong={gA_Long} glassShort={gA_Short}
         shellColor={shellColor} emColor={emLit} accent={accent}
       />
       <GlassBlock
-        cx={BLOCK_B_CX} glassLong={gB_Long} glassShort={gB_Short}
+        cx={BLOCK_B_CX} w={BLOCK_B_W} glassLong={gB_Long} glassShort={gB_Short}
         shellColor={shellColor} emColor={emLit} accent={accent}
       />
 
-      {/* ── Sky bridge connecting the blocks ── */}
-      <mesh position={[0, bridgeY, BAND_CZ]}>
+      {/* ── Sky bridge connecting the blocks (gap midpoint shifts with asymmetry) ── */}
+      <mesh position={[bridgeCX, bridgeY, BAND_CZ]}>
         <boxGeometry args={[bridgeSpan, FLOOR_H * 0.9, 16]} />
         <meshStandardMaterial color={shellColor} roughness={0.3} metalness={0.6} />
       </mesh>
-      <mesh position={[0, bridgeY, BAND_CZ]}>
+      <mesh position={[bridgeCX, bridgeY, BAND_CZ]}>
         <boxGeometry args={[bridgeSpan + 0.4, FLOOR_H * 0.55, 16.4]} />
         <meshStandardMaterial
           color={emLit} emissive={emLit} emissiveIntensity={0.7}
@@ -538,7 +544,7 @@ export default function SoftplanLandmark({
         />
       </mesh>
       {/* Glass roof of the bridge — soft bluish tint, transparent */}
-      <mesh position={[0, bridgeY + FLOOR_H * 0.5, BAND_CZ]}>
+      <mesh position={[bridgeCX, bridgeY + FLOOR_H * 0.5, BAND_CZ]}>
         <boxGeometry args={[bridgeSpan + 1, 0.4, 16.6]} />
         <meshStandardMaterial
           color="#9ec4de" emissive="#6fa9c8" emissiveIntensity={0.25}
@@ -547,35 +553,53 @@ export default function SoftplanLandmark({
         />
       </mesh>
 
-      {/* ── Textile second skin on south face (over the lake), covers both blocks ── */}
-      {Array.from({ length: TEXTILE_PANELS }, (_, i) => {
-        const totalW = COMPLEX_W;
-        const panelW = totalW / TEXTILE_PANELS - 1;
-        const cx = -totalW / 2 + panelW / 2 + i * (panelW + 1) + 0.5;
-        // Skip panels that would fall inside the gap
-        if (Math.abs(cx) < GAP / 2 + 2) return null;
-        return (
-          <mesh
-            key={`textile-${i}`}
-            position={[cx, 3 + BLOCK_H * 0.58, BAND_CZ + hd + 5]}
-            rotation={[-0.38, 0, 0]}
-          >
-            <planeGeometry args={[panelW, BLOCK_H * 0.75]} />
+      {/* ── Thin horizontal brise louvers on all 4 sides of each block, one per floor ── */}
+      {[
+        { cx: BLOCK_A_CX, w: BLOCK_A_W },
+        { cx: BLOCK_B_CX, w: BLOCK_B_W },
+      ].flatMap(({ cx, w }) =>
+        Array.from({ length: FLOORS }, (_, i) => {
+          const y = 3 + (i + 0.5) * FLOOR_H;
+          const mat = (
             <meshStandardMaterial
-              color={textileColor} roughness={0.9} metalness={0}
-              side={THREE.DoubleSide} transparent opacity={0.82}
+              color={textileColor} roughness={0.85} metalness={0.1}
+              transparent opacity={0.85}
             />
-          </mesh>
-        );
-      })}
+          );
+          return (
+            <group key={`louvers-${cx}-${i}`}>
+              {/* South */}
+              <mesh position={[cx, y, BAND_CZ + hd + 1.6]} rotation={[-0.18, 0, 0]}>
+                <boxGeometry args={[w - 2, 0.4, 2.6]} />
+                {mat}
+              </mesh>
+              {/* North */}
+              <mesh position={[cx, y, BAND_CZ - hd - 1.6]} rotation={[0.18, 0, 0]}>
+                <boxGeometry args={[w - 2, 0.4, 2.6]} />
+                {mat}
+              </mesh>
+              {/* East */}
+              <mesh position={[cx + w / 2 + 1.6, y, BAND_CZ]} rotation={[0, 0, -0.18]}>
+                <boxGeometry args={[2.6, 0.4, BLOCK_D - 2]} />
+                {mat}
+              </mesh>
+              {/* West */}
+              <mesh position={[cx - w / 2 - 1.6, y, BAND_CZ]} rotation={[0, 0, 0.18]}>
+                <boxGeometry args={[2.6, 0.4, BLOCK_D - 2]} />
+                {mat}
+              </mesh>
+            </group>
+          );
+        }),
+      )}
 
       {/* ── Attic — one per tower (separate volumes; only the marquise bridges them) ── */}
       <mesh position={[BLOCK_A_CX, ATTIC_CY, BAND_CZ]}>
-        <boxGeometry args={[BLOCK_W + 4, ATTIC_H, BLOCK_D + 4]} />
+        <boxGeometry args={[BLOCK_A_W + 4, ATTIC_H, BLOCK_D + 4]} />
         <meshStandardMaterial color="#2a2e38" roughness={0.4} metalness={0.5} />
       </mesh>
       <mesh position={[BLOCK_B_CX, ATTIC_CY, BAND_CZ]}>
-        <boxGeometry args={[BLOCK_W + 4, ATTIC_H, BLOCK_D + 4]} />
+        <boxGeometry args={[BLOCK_B_W + 4, ATTIC_H, BLOCK_D + 4]} />
         <meshStandardMaterial color="#2a2e38" roughness={0.4} metalness={0.5} />
       </mesh>
 
@@ -585,8 +609,8 @@ export default function SoftplanLandmark({
         const colH = ATTIC_COL_H;
         const colY = ATTIC_TOP_Y + colH / 2;
         const overBlock = (x: number) =>
-          (x >= BLOCK_A_CX - BLOCK_W / 2 + 2 && x <= BLOCK_A_CX + BLOCK_W / 2 - 2) ||
-          (x >= BLOCK_B_CX - BLOCK_W / 2 + 2 && x <= BLOCK_B_CX + BLOCK_W / 2 - 2);
+          (x >= BLOCK_A_CX - BLOCK_A_W / 2 + 2 && x <= BLOCK_A_CX + BLOCK_A_W / 2 - 2) ||
+          (x >= BLOCK_B_CX - BLOCK_B_W / 2 + 2 && x <= BLOCK_B_CX + BLOCK_B_W / 2 - 2);
         return Array.from({ length: 5 }, (_, i) => {
           const x = -CANOPY_W / 2 + 6 + (i * (CANOPY_W - 12)) / 4;
           if (!overBlock(x)) return null;
@@ -706,14 +730,14 @@ export default function SoftplanLandmark({
       ))}
 
       {/* ── Parking lot (west) ── */}
-      <mesh position={[BLOCK_A_CX - BLOCK_W / 2 - 34, 0.9, BAND_CZ]}>
+      <mesh position={[BLOCK_A_CX - BLOCK_A_W / 2 - 34, 0.9, BAND_CZ]}>
         <boxGeometry args={[58, 0.2, 76]} />
         <meshStandardMaterial color="#1a1a1a" roughness={0.95} metalness={0} />
       </mesh>
       {Array.from({ length: 24 }, (_, i) => {
         const row = Math.floor(i / 8);
         const col = i % 8;
-        const x = BLOCK_A_CX - BLOCK_W / 2 - 56 + col * 6;
+        const x = BLOCK_A_CX - BLOCK_A_W / 2 - 56 + col * 6;
         const z = BAND_CZ - 30 + row * 20;
         return (
           <mesh key={`car-${i}`} position={[x, 1.8, z]}>
@@ -725,10 +749,10 @@ export default function SoftplanLandmark({
 
       {/* ── Trees scattered around ── */}
       {[
-        [BLOCK_A_CX - BLOCK_W / 2 - 70, BAND_CZ - 30],
-        [BLOCK_A_CX - BLOCK_W / 2 - 76, BAND_CZ + 30],
-        [BLOCK_B_CX + BLOCK_W / 2 + 22, BAND_CZ - 20],
-        [BLOCK_B_CX + BLOCK_W / 2 + 26, BAND_CZ + 28],
+        [BLOCK_A_CX - BLOCK_A_W / 2 - 70, BAND_CZ - 30],
+        [BLOCK_A_CX - BLOCK_A_W / 2 - 76, BAND_CZ + 30],
+        [BLOCK_B_CX + BLOCK_B_W / 2 + 22, BAND_CZ - 20],
+        [BLOCK_B_CX + BLOCK_B_W / 2 + 26, BAND_CZ + 28],
         [-80, LAKE_CZ - 50],
         [80, LAKE_CZ - 40],
       ].map(([tx, tz], i) => (
