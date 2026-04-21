@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { providerConfig } from "@/lib/auth-config";
+import { appConfig } from "@/lib/app-config";
 import {
   generateCityLayout,
   DISTRICT_NAMES,
@@ -2953,7 +2954,7 @@ function HomeContent() {
           {/* Desktop: GitHub + Discord */}
           {starCount != null && (
             <a
-              href="https://github.com/srizzon/git-city"
+              href={appConfig.repoUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
@@ -3509,7 +3510,7 @@ function HomeContent() {
                 <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
               </a>
               <a
-                href="https://github.com/srizzon/git-city"
+                href={appConfig.repoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setMobileMenuOpen(false)}
@@ -3588,13 +3589,13 @@ function HomeContent() {
               <p className="pointer-events-auto mt-1 text-[9px] text-cream/50 normal-case hidden sm:block">
                 built by{" "}
                 <a
-                  href="https://x.com/samuelrizzondev"
+                  href={appConfig.authorUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-colors hover:text-cream"
                   style={{ color: theme.accent }}
                 >
-                  @samuelrizzondev
+                  @{appConfig.authorHandle}
                 </a>
               </p>
             </div>
@@ -3614,7 +3615,7 @@ function HomeContent() {
                   const label = target >= 1000 ? `${target / 1000}K` : target.toLocaleString();
                   return (
                     <a
-                      href="https://github.com/srizzon/git-city"
+                      href={appConfig.repoUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full max-w-sm group"
