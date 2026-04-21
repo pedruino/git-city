@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { providerConfig } from "@/lib/auth-config";
 
 export const metadata: Metadata = {
   title: "Shop - Git City",
@@ -69,7 +70,7 @@ export default async function ShopLanding() {
               <div className="flex gap-3 border-2 border-border bg-bg-card px-4 py-3">
                 <span style={{ color: ACCENT }}>1.</span>
                 <span>
-                  Sign in with <span className="text-cream">GitHub</span> to
+                  Sign in with <span className="text-cream">{providerConfig.displayName}</span> to
                   connect your account
                 </span>
               </div>
@@ -100,7 +101,7 @@ export default async function ShopLanding() {
                 boxShadow: "4px 4px 0 0 #5a7a00",
               }}
             >
-              Sign in with GitHub
+              Sign in with {providerConfig.displayName}
             </Link>
             <p className="text-[8px] text-dim normal-case">
               We only read your public profile info
