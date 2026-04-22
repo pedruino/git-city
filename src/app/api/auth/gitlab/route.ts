@@ -4,7 +4,12 @@ import { createServerSupabase } from "@/lib/supabase-server";
 const PROVIDER = "gitlab" as const;
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
+  // Behind Railway's proxy request.url has the container-internal origin —
+  // using it for the OAuth redirect_to would make the browser land on
+  // localhost after auth. Prefer the public URL when configured.
+  const origin = process.env.NEXT_PUBLIC_BASE_URL ?? url.origin;
   const redirectPath = searchParams.get("redirect") ?? "/";
 
   const supabase = await createServerSupabase();

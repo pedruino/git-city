@@ -33,7 +33,12 @@ function emailDomainAllowed(email: string | null | undefined): boolean {
 }
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
+  // Same reasoning as /api/auth/signin: behind Railway's proxy `request.url`
+  // surfaces the container-internal origin (http://localhost:8080), which
+  // would make every subsequent redirect land on localhost in the browser.
+  const origin = process.env.NEXT_PUBLIC_BASE_URL ?? url.origin;
   const code = searchParams.get("code");
 
   console.log("[auth/callback] hit", { origin, hasCode: !!code, query: Object.fromEntries(searchParams) });

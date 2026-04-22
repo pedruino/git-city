@@ -8,7 +8,13 @@ import { ACTIVE_PROVIDER, getProviderConfig } from "@/lib/auth-config";
  * there first (with a hop param so we come back here to finish OAuth).
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const searchParams = url.searchParams;
+  // Behind Railway's proxy, request.url reflects the container's internal
+  // origin (http://localhost:8080). Supabase then builds the OAuth redirect
+  // against that private origin and the browser never finds the callback.
+  // Prefer the public URL when configured.
+  const origin = process.env.NEXT_PUBLIC_BASE_URL ?? url.origin;
   const redirectPath = searchParams.get("redirect") ?? "/";
   const samlDone = searchParams.get("saml_done") === "1";
   const config = getProviderConfig();
