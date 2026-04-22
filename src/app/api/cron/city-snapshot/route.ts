@@ -7,6 +7,8 @@ export const maxDuration = 300;
 const STORAGE_BUCKET = "city-data";
 const STORAGE_PATH = "snapshot.json";
 const PAGE_SIZE = 1000; // Supabase PostgREST caps at 1000 rows per request
+const DEBOUNCE_MS = 60_000; // skip regeneration if snapshot is fresher than this
+const SNAPSHOT_PUBLIC_URL_PATH = `/storage/v1/object/public/${STORAGE_BUCKET}/${STORAGE_PATH}`;
 
 /** Paginate through all rows of a table. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,6 +48,34 @@ export async function GET(request: NextRequest) {
 
   // Ensure public bucket exists (idempotent)
   await sb.storage.createBucket(STORAGE_BUCKET, { public: true }).catch(() => {});
+
+  // Debounce: if the on-disk snapshot is fresher than DEBOUNCE_MS, skip the
+  // regeneration. Prevents herd effect when many users log in at once (each
+  // login fires `after()` calling this endpoint). The scheduled cron and
+  // manual forces with `?force=1` bypass the check.
+  const force = request.nextUrl?.searchParams.get("force") === "1";
+  if (!force) {
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (base) {
+      try {
+        const head = await fetch(`${base}${SNAPSHOT_PUBLIC_URL_PATH}`, { method: "HEAD" });
+        const lastModified = head.headers.get("last-modified");
+        if (lastModified) {
+          const ageMs = Date.now() - new Date(lastModified).getTime();
+          if (ageMs < DEBOUNCE_MS) {
+            return NextResponse.json({
+              ok: true,
+              skipped: "debounced",
+              age_ms: ageMs,
+              duration_ms: Date.now() - started,
+            });
+          }
+        }
+      } catch {
+        // On HEAD failure, fall through and regenerate rather than block.
+      }
+    }
+  }
 
   // Fetch everything in parallel
   const [devs, purchases, giftPurchases, customizations, achievements, raidTags, activeDropsResult, statsResult] =
@@ -194,7 +224,10 @@ export async function GET(request: NextRequest) {
     .upload(STORAGE_PATH, compressed, {
       contentType: "application/gzip",
       upsert: true,
-      cacheControl: "no-cache",
+      // Let Supabase/Cloudflare CDN hold the object for 5 minutes. Client already
+      // busts the URL with `Math.floor(Date.now()/300_000)` to align refresh with
+      // this window.
+      cacheControl: "public, max-age=300, immutable",
     });
 
   if (uploadError) {

@@ -82,16 +82,18 @@ async function findUserByUsername(username: string, accessToken?: string): Promi
 }
 
 async function fetchUserProjects(userId: number, accessToken?: string): Promise<GitLabProject[]> {
-  const all: GitLabProject[] = [];
-  for (let page = 1; page <= 2; page++) {
-    const { data } = await glFetch<GitLabProject[]>(
+  // Fetch pages 1 and 2 in parallel. Most users have < 100 projects, so page 2
+  // returns [] quickly; for power users we halve the wall time vs. the serial
+  // "await page 1, then decide" loop. Sorted by star_count desc, so truncating
+  // after 200 is acceptable.
+  const fetchPage = (page: number) =>
+    glFetch<GitLabProject[]>(
       `/users/${userId}/projects?per_page=100&order_by=star_count&sort=desc&page=${page}`,
       accessToken,
-    );
-    all.push(...data);
-    if (data.length < 100) break;
-  }
-  return all;
+    ).then((r) => r.data);
+
+  const [p1, p2] = await Promise.all([fetchPage(1), fetchPage(2)]);
+  return [...p1, ...p2];
 }
 
 /**
