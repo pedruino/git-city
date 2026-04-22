@@ -17,4 +17,10 @@ export const appConfig = {
   forkHandle: process.env.NEXT_PUBLIC_FORK_HANDLE ?? "pedruino",
   /** Fork-maintainer profile URL. */
   forkUrl: process.env.NEXT_PUBLIC_FORK_URL ?? "https://github.com/pedruino",
+  /**
+   * Label used between the upstream author and the fork maintainer.
+   * Conveys the scope of the fork work. Defaults to "customized & maintained by".
+   * Examples: "maintained by", "extended by", "Softplan edition by".
+   */
+  forkLabel: process.env.NEXT_PUBLIC_FORK_LABEL ?? "customized & maintained by",
 };

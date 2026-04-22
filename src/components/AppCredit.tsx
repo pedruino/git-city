@@ -37,7 +37,7 @@ export default function AppCredit({
       </a>
       {appConfig.forkHandle && (
         <>
-          {" · fork by "}
+          {` · ${appConfig.forkLabel} `}
           <a
             href={appConfig.forkUrl}
             target="_blank"
