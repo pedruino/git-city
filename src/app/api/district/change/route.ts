@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 
 const VALID_DISTRICTS = [
   "frontend", "backend", "fullstack", "mobile", "data_ai",
@@ -36,7 +37,8 @@ export async function POST(request: Request) {
   }
 
   // Fetch developer
-  const login = user.user_metadata?.user_name?.toLowerCase();
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const login = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
   if (!login) {
     return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });
   }

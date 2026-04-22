@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { SURVEYS } from "@/lib/surveys";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 
 // GET /api/survey?id=earcade_v1 — check if user already responded
 export async function GET(req: Request) {
@@ -14,7 +15,8 @@ export async function GET(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ answered: false });
 
-  const login = user.user_metadata?.user_name;
+  const { data: { session: __session } } = await sb.auth.getSession();
+  const login = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
   if (!login) return NextResponse.json({ answered: false });
 
   const admin = getSupabaseAdmin();
@@ -65,7 +67,8 @@ export async function POST(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const login = user.user_metadata?.user_name;
+  const { data: { session: __session } } = await sb.auth.getSession();
+  const login = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
   if (!login) return NextResponse.json({ error: "No GitHub login" }, { status: 400 });
 
   const admin = getSupabaseAdmin();
