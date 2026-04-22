@@ -13,6 +13,8 @@ import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/x
 import ClaimButton from "@/components/ClaimButton";
 import DeleteAccountButton from "@/components/DeleteAccountButton";
 import ShareButtons from "@/components/ShareButtons";
+import { providerConfig } from "@/lib/auth-config";
+import AppCredit from "@/components/AppCredit";
 import CompareChallenge from "@/components/CompareChallenge";
 import ProfileDistrict from "@/components/ProfileDistrict";
 import ReferralCTA from "@/components/ReferralCTA";
@@ -433,15 +435,15 @@ export default async function DevPage({ params }: Props) {
           </div>
         )}
 
-        {/* GitHub link */}
+        {/* Provider profile link */}
         <div className="mt-8 text-center">
           <a
-            href={`https://github.com/${dev.github_login}`}
+            href={providerConfig.profileUrlFor(dev.github_login)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-muted transition-colors hover:text-cream normal-case"
           >
-            github.com/{dev.github_login} &rarr;
+            {providerConfig.host.replace(/^https?:\/\//, "")}/{dev.github_login} &rarr;
           </a>
         </div>
 
@@ -462,18 +464,7 @@ export default async function DevPage({ params }: Props) {
 
         {/* Creator credit */}
         <div className="mt-6 border-t border-border/50 pt-4 text-center">
-          <p className="text-[9px] text-muted normal-case">
-            built by{" "}
-            <a
-              href="https://x.com/samuelrizzondev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-cream"
-              style={{ color: accent }}
-            >
-              @samuelrizzondev
-            </a>
-          </p>
+          <AppCredit accent={accent} />
         </div>
       </div>
     </main>

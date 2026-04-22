@@ -6,6 +6,7 @@ import { createBrowserSupabase } from "@/lib/supabase";
 import { ROADMAP_PHASES, VOTABLE_ITEM_IDS } from "@/lib/roadmap-data";
 import type { RoadmapPhase, RoadmapItem, ItemStatus } from "@/lib/roadmap-data";
 import { toggleVote } from "./actions";
+import AppCredit from "@/components/AppCredit";
 
 const ACCENT = "#c8e64a";
 const CREAM = "#e8dcc8";
@@ -154,18 +155,7 @@ export default function RoadmapClient({
             Enter the City
           </Link>
 
-          <p className="mt-6 text-[9px] text-muted normal-case">
-            built by{" "}
-            <a
-              href="https://x.com/samuelrizzondev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-cream"
-              style={{ color: ACCENT }}
-            >
-              @samuelrizzondev
-            </a>
-          </p>
+          <AppCredit accent={ACCENT} className="mt-6 text-[9px] text-muted normal-case" />
         </div>
       </div>
     </main>

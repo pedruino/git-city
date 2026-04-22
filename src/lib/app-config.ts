@@ -13,4 +13,8 @@ export const appConfig = {
   repoUrl: process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/pedruino/git-city",
   /** Discord server invite. */
   discordUrl: process.env.NEXT_PUBLIC_DISCORD_URL ?? "https://discord.gg/2bTjFAkny7",
+  /** Fork-maintainer handle shown alongside the upstream credit. Optional. */
+  forkHandle: process.env.NEXT_PUBLIC_FORK_HANDLE ?? "pedruino",
+  /** Fork-maintainer profile URL. */
+  forkUrl: process.env.NEXT_PUBLIC_FORK_URL ?? "https://github.com/pedruino",
 };

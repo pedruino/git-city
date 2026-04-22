@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { trackAdvertiseCtaClick } from "@/lib/himetrica";
 import { MAX_TEXT_LENGTH } from "@/lib/skyAds";
+import AppCredit from "@/components/AppCredit";
 
 const AdPreview = dynamic(() => import("@/components/AdPreview"), { ssr: false });
 
@@ -498,18 +499,7 @@ export default function AdvertiseLanding() {
             samuel@thegitcity.com
           </a>
         </p>
-        <p className="mt-4 text-xs text-muted normal-case">
-          Built by{" "}
-          <a
-            href="https://x.com/samuelrizzondev"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="transition-colors hover:text-cream"
-            style={{ color: ACCENT }}
-          >
-            @samuelrizzondev
-          </a>
-        </p>
+        <AppCredit accent={ACCENT} variant="upper" className="mt-4 text-xs text-muted normal-case" />
       </footer>
 
       {/* ── Checkout Modal ── */}

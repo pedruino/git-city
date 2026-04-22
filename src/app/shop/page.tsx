@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { providerConfig } from "@/lib/auth-config";
+import AppCredit from "@/components/AppCredit";
 
 export const metadata: Metadata = {
   title: "Shop - Git City",
@@ -111,18 +112,7 @@ export default async function ShopLanding() {
 
         {/* Creator credit */}
         <div className="mt-10 border-t border-border/50 pt-4 text-center">
-          <p className="text-[9px] text-muted normal-case">
-            built by{" "}
-            <a
-              href="https://x.com/samuelrizzondev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-cream"
-              style={{ color: ACCENT }}
-            >
-              @samuelrizzondev
-            </a>
-          </p>
+          <AppCredit accent={ACCENT} />
         </div>
       </div>
     </main>

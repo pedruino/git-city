@@ -8,6 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createBrowserSupabase } from "@/lib/supabase";
 import { providerConfig, ACTIVE_PROVIDER } from "@/lib/auth-config";
 import { appConfig } from "@/lib/app-config";
+import AppCredit from "@/components/AppCredit";
 import {
   generateCityLayout,
   DISTRICT_NAMES,

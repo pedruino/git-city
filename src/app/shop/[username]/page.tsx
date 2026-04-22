@@ -6,6 +6,7 @@ import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getOwnedItems } from "@/lib/items";
 import type { ShopItem } from "@/lib/items";
+import AppCredit from "@/components/AppCredit";
 import { calcBuildingDims } from "@/lib/github";
 import { getBalance } from "@/lib/pixels";
 import ShopClient from "@/components/ShopClient";
@@ -281,18 +282,7 @@ export default async function ShopPage({ params, searchParams }: Props) {
 
         {/* Creator credit */}
         <div className="mt-10 border-t border-border/50 pt-4 text-center">
-          <p className="text-[9px] text-muted normal-case">
-            built by{" "}
-            <a
-              href="https://x.com/samuelrizzondev"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition-colors hover:text-cream"
-              style={{ color: ACCENT }}
-            >
-              @samuelrizzondev
-            </a>
-          </p>
+          <AppCredit accent={ACCENT} />
         </div>
       </div>
     </main>
