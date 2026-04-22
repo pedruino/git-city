@@ -58,7 +58,7 @@
     "server-only": "^0.0.1",
     "stripe": "^20.3.1",
     "svix": "^1.89.0",
-    "three": "^0.184.0"
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.97",
