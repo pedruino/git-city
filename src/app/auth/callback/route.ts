@@ -6,10 +6,31 @@ import { cacheEmailFromAuth, touchLastActive, ensurePreferences } from "@/lib/no
 import { sendWelcomeNotification } from "@/lib/notification-senders/welcome";
 import { sendReferralJoinedNotification } from "@/lib/notification-senders/referral";
 import { getProviderFromSession } from "@/lib/providers";
+import { ACTIVE_PROVIDER } from "@/lib/auth-config";
+import { fetchGitLabUserById } from "@/lib/providers/gitlab/api";
 import { calculateGithubXp } from "@/lib/xp";
 
 // Extend timeout for GitHub API calls during login
 export const maxDuration = 60;
+
+// Tenant allow-list for SSO. Only accept users whose email belongs to one of
+// these domains. Prevents external accounts (whose `provider_id` could map to
+// an unrelated GitLab username) from claiming records. Configurable via
+// AUTH_ALLOWED_EMAIL_DOMAINS (comma-separated); falls back to the hard default
+// that matches the fork's target tenant.
+const ALLOWED_EMAIL_DOMAINS = (
+  process.env.AUTH_ALLOWED_EMAIL_DOMAINS ?? "softplan.com.br"
+)
+  .split(",")
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean);
+
+function emailDomainAllowed(email: string | null | undefined): boolean {
+  if (ALLOWED_EMAIL_DOMAINS.length === 0) return true;
+  if (!email) return false;
+  const domain = email.split("@")[1]?.toLowerCase();
+  return !!domain && ALLOWED_EMAIL_DOMAINS.includes(domain);
+}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -26,9 +47,39 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/?error=auth_failed`);
   }
 
+  // Enforce tenant allow-list before touching anything. If the email is
+  // outside the allow-list we sign the session out so the user ends up
+  // anonymous on the home with an explicit error.
+  const userEmail = (data.user.email ?? data.user.user_metadata?.email) as
+    | string
+    | undefined;
+  if (!emailDomainAllowed(userEmail)) {
+    await supabase.auth.signOut().catch(() => {});
+    return NextResponse.redirect(`${origin}/?error=unauthorized_domain`);
+  }
+
   const provider = getProviderFromSession(data.user);
   const identity = provider.extractIdentity(data.user.user_metadata ?? {});
-  const githubLogin = identity?.login ?? "";
+  let githubLogin = identity?.login ?? "";
+
+  // For GitLab, metadata doesn't expose the real username. Resolve it via the
+  // API using provider_id (OIDC sub) instead of relying on the brittle
+  // email-local-part fallback — a user's GitLab username is frequently
+  // different from their email local part (e.g. `sylvio.junior@…` vs
+  // actual username `stsjr`).
+  if (ACTIVE_PROVIDER === "gitlab") {
+    const providerId = (data.user.user_metadata?.provider_id ??
+      data.user.user_metadata?.sub) as string | number | undefined;
+    if (providerId) {
+      const glUser = await fetchGitLabUserById(
+        providerId,
+        data.session?.provider_token ?? undefined,
+      );
+      if (glUser?.username) {
+        githubLogin = glUser.username.toLowerCase();
+      }
+    }
+  }
 
   // User's own OAuth access token from the provider (GitLab/GitHub). Supabase
   // keeps it on the session; we use it in memory during this request only —

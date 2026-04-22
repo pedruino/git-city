@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getProviderFromSession } from "@/lib/providers";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 
 // Refresh the logged-in user's dev record using their own OAuth token.
 // Called by the client when the snapshot is stale. Token is used in memory
@@ -17,14 +18,14 @@ export async function POST(request: Request) {
   }
 
   const provider = getProviderFromSession(session.user);
-  const identity = provider.extractIdentity(session.user.user_metadata ?? {});
-  const login = identity?.login;
+  const providerToken = session.provider_token ?? undefined;
+  const login = await resolveLoginFromSupabaseUser(session.user, {
+    accessToken: providerToken,
+  });
 
   if (!login) {
     return NextResponse.json({ error: "no_provider_identity" }, { status: 400 });
   }
-
-  const providerToken = session.provider_token ?? undefined;
 
   try {
     const ghData = await provider.fetchDeveloperData(login, {

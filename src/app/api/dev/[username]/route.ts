@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { calculateGithubXp } from "@/lib/xp";
 import { getActiveProvider, ProviderFetchError } from "@/lib/providers";
-import { loginFromSupabaseUser } from "@/lib/auth-identity";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 
 // Allow up to 60s on Vercel (Pro plan). Hobby plan max is 10s.
 export const maxDuration = 60;
@@ -76,11 +76,14 @@ export async function GET(
       const { data: { user } } = await authClient.auth.getUser();
       if (user) {
         authUserId = user.id;
-        // Use the provider-aware helper so GitLab sessions (whose metadata has
-        // no `user_name`/`preferred_username`) still resolve via nickname or
-        // email-local-part fallback. Without this, the self-heal branch below
-        // never fires for GitLab users whose auth/callback upsert failed.
-        const authLogin = loginFromSupabaseUser(user).toLowerCase();
+        // Resolve the real provider username. For GitHub OAuth the sync
+        // metadata path returns immediately; for GitLab SAML/OIDC where
+        // metadata carries no username, this does an async lookup on
+        // /users/:provider_id. Either way we end up with the real handle,
+        // not one derived from the email local-part.
+        const authLogin = (
+          await resolveLoginFromSupabaseUser(user)
+        ).toLowerCase();
         isOwnProfile = authLogin === username.toLowerCase();
       }
     } catch {}
