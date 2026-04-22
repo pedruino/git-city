@@ -58,8 +58,7 @@ export default function PrivacyPage() {
                 authentication
               </Li>
               <Li>
-                <span style={{ color: ACCENT }}>Vercel</span> - Hosting and
-                analytics
+                <span style={{ color: ACCENT }}>Railway</span> - Hosting
               </Li>
               <Li>
                 <span style={{ color: ACCENT }}>Stripe</span> - Payment
@@ -79,9 +78,8 @@ export default function PrivacyPage() {
           <Section n={4} title="Cookies & Local Storage">
             <p>
               We use cookies for authentication sessions and local storage for
-              user preferences (theme, district selection). We use Vercel
-              Analytics for anonymous usage data. No third-party tracking cookies
-              are used.
+              user preferences (theme, district selection). No third-party
+              tracking cookies are used.
             </p>
           </Section>
 

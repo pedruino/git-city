@@ -554,7 +554,7 @@ function SlideFounder() {
             <Pill>Three.js</Pill>
             <Pill>Supabase</Pill>
             <Pill>Stripe</Pill>
-            <Pill>Vercel</Pill>
+            <Pill>Railway</Pill>
           </div>
         </div>
       </div>

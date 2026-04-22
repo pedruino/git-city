@@ -528,7 +528,6 @@ function HomeContent() {
   const [clickedAd, setClickedAd] = useState<import("@/lib/skyAds").SkyAd | null>(null);
   const [skyAds, setSkyAds] = useState<import("@/lib/skyAds").SkyAd[]>(DEFAULT_SKY_ADS);
   const [starCount, setStarCount] = useState<number | null>(null);
-  const [discordMembers, setDiscordMembers] = useState<number | null>(null);
   const [jobCount, setJobCount] = useState<number | null>(null);
   const [jobPanelOpen, setJobPanelOpen] = useState(false);
   const [jobPreview, setJobPreview] = useState<Array<{ id: string; title: string; salary_min: number; salary_max: number; salary_currency: string; tier: string; seniority: string; role_type: string; company: { name: string } | null }>>([]);
@@ -585,15 +584,12 @@ function HomeContent() {
   const prevRaidPhaseRef = useRef<string>("idle");
   const lastSuccessfulRaidRef = useRef<{ defenderLogin: string; attackerLogin: string; tagStyle: string } | null>(null);
 
-  // Fetch GitHub star count + Discord member count + Arcade player count
+  // Fetch GitHub star count (from the fork repo) + Arcade player count
+  // Discord member fetch disabled — indicator is hidden.
   useEffect(() => {
-    fetch("https://api.github.com/repos/srizzon/git-city")
+    fetch(`${appConfig.repoUrl.replace("github.com/", "api.github.com/repos/")}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d?.stargazers_count != null) setStarCount(d.stargazers_count); })
-      .catch(() => { });
-    fetch("https://discord.com/api/v9/invites/2bTjFAkny7?with_counts=true")
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.approximate_member_count != null) setDiscordMembers(d.approximate_member_count); })
       .catch(() => { });
     fetch("/api/jobs?preview=true")
       .then((r) => r.ok ? r.json() : null)
@@ -3021,16 +3017,7 @@ function HomeContent() {
               <span className="text-cream">{starCount.toLocaleString()}</span>
             </a>
           )}
-          <a
-            href="https://discord.gg/2bTjFAkny7"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:flex items-center gap-1.5 border-[3px] border-border bg-bg/70 px-2.5 py-1 text-[10px] backdrop-blur-sm transition-colors hover:border-border-light"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2]"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
-            <span className="hidden sm:inline text-cream">Discord</span>
-            {discordMembers != null && <span className="text-cream">{discordMembers.toLocaleString()}</span>}
-          </a>
+          {/* Discord badge hidden */}
         </div>
       )}
 
@@ -3536,20 +3523,7 @@ function HomeContent() {
               <p className="text-[9px] text-muted/50 uppercase tracking-[0.2em]">Community</p>
             </div>
             <div className="divide-y divide-border/40">
-              <a
-                href="https://discord.gg/2bTjFAkny7"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-between px-5 py-3.5 active:bg-white/5"
-              >
-                <span className="flex items-center gap-2 text-sm text-cream">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-[#5865F2] shrink-0"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z" /></svg>
-                  Discord
-                  {discordMembers != null && <span className="text-[10px] text-muted">{discordMembers.toLocaleString()} members</span>}
-                </span>
-                <span className="text-xs" style={{ color: theme.accent }}>&#8594;</span>
-              </a>
+              {/* Discord link hidden */}
               <a
                 href={appConfig.repoUrl}
                 target="_blank"

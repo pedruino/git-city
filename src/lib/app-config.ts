@@ -10,7 +10,7 @@ export const appConfig = {
   /** Full URL of the author's social profile (X/Twitter, Bluesky, LinkedIn). */
   authorUrl: process.env.NEXT_PUBLIC_AUTHOR_URL ?? "https://x.com/samuelrizzondev",
   /** Upstream repo URL (★ badge, "Star us on GitHub" CTA). */
-  repoUrl: process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/srizzon/git-city",
+  repoUrl: process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/pedruino/git-city",
   /** Discord server invite. */
   discordUrl: process.env.NEXT_PUBLIC_DISCORD_URL ?? "https://discord.gg/2bTjFAkny7",
 };
