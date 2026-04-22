@@ -560,6 +560,7 @@ function HomeContent() {
   const buildingClickCountRef = useRef(0);
   const signInPromptShownRef = useRef(false);
   const [signInPromptVisible, setSignInPromptVisible] = useState(false);
+  const [showPrivateContribModal, setShowPrivateContribModal] = useState(false);
   const [adToast, setAdToast] = useState<string | null>(null);
 
   // Welcome CTA (shown after intro for non-logged-in users)
@@ -2011,7 +2012,7 @@ function HomeContent() {
     searchUser();
   };
 
-  const handleSignIn = handleSignInWithRef;
+  const handleSignIn = () => setShowPrivateContribModal(true);
 
   const handleSignOut = async () => {
     try {
@@ -4116,6 +4117,52 @@ function HomeContent() {
         </div>
       )}
 
+      {/* ─── Private contributions onboarding modal ─── */}
+      {showPrivateContribModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm border-[3px] border-border bg-bg-raised animate-[slide-up_0.2s_ease-out]">
+            <div className="px-5 py-4">
+              <p className="font-pixel text-[11px] tracking-widest text-cream mb-3">
+                ENABLE PRIVATE CONTRIBUTIONS
+              </p>
+              <p className="text-[11px] text-muted leading-relaxed mb-3">
+                To count contributions from private repositories, enable this setting in your GitLab profile before signing in:
+              </p>
+              <div className="border border-border bg-bg px-3 py-2.5 mb-4">
+                <p className="text-[10px] text-cream leading-relaxed">
+                  <span className="text-dim">GitLab →</span> Profile Settings →{" "}
+                  <span className="text-accent">Include private contributions on your profile</span>
+                </p>
+                <a
+                  href="https://gitlab.com/-/user_settings/profile"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] text-dim hover:text-muted underline mt-1 block"
+                >
+                  gitlab.com/-/user_settings/profile ↗
+                </a>
+              </div>
+              <button
+                onClick={() => { setShowPrivateContribModal(false); handleSignInWithRef(); }}
+                className="btn-press w-full py-2.5 text-[10px] text-bg mb-2"
+                style={{
+                  backgroundColor: providerConfig.buttonColor || theme.accent,
+                  boxShadow: `2px 2px 0 0 ${theme.shadow}`,
+                }}
+              >
+                Already enabled — Sign in
+              </button>
+              <button
+                onClick={() => { setShowPrivateContribModal(false); handleSignInWithRef(); }}
+                className="w-full py-1.5 text-[9px] text-dim hover:text-muted transition-colors"
+              >
+                Skip — sign in without private contributions
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── A1: Sign-in prompt after building exploration ─── */}
       {signInPromptVisible && !session && (
         <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-xs animate-[slide-up_0.2s_ease-out]">
@@ -5735,7 +5782,7 @@ function HomeContent() {
           onClose={() => setFounderMessageOpen(false)}
           session={session}
           hasClaimed={!!myBuilding?.claimed}
-          onSignIn={handleSignInWithRef}
+          onSignIn={handleSignIn}
         />
       )}
 
@@ -5750,7 +5797,7 @@ function HomeContent() {
             window.location.href = "/jobs";
           }}
           session={session}
-          onSignIn={handleSignInWithRef}
+          onSignIn={handleSignIn}
         />
       )}
 
