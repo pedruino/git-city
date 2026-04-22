@@ -31,6 +31,14 @@ async function getAuthenticatedDevId(): Promise<{ devId: number } | { error: str
 export async function GET() {
   const auth = await getAuthenticatedDevId();
   if ("error" in auth) {
+    // For the "no dev record yet" case, return 200 with null key — the client
+    // already handles this gracefully and it avoids a noisy 404 in the console
+    // for every logged-in user who hasn't claimed a building.
+    if (auth.status === 404) {
+      return NextResponse.json({ key: null }, {
+        headers: { "Cache-Control": "private, max-age=300" },
+      });
+    }
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
