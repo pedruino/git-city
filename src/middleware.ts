@@ -34,9 +34,8 @@ const ROUTE_LIMITS: [string, number, number][] = [
   ["/api/city", 30, 60_000],
   ["/api/dev/", 60, 60_000],
   ["/api/items", 30, 60_000],
-  // /api/auth is hit 2-3 times during SAML (signin → saml_done redirect → OAuth).
-  // Key is per-IP, so everyone behind a corporate NAT shares the bucket.
-  // Keep a high ceiling just to block real abuse.
+  // /api/auth is hit once per login (redirect into OAuth). Key is per-IP, so
+  // everyone behind a corporate NAT shares the bucket — keep a high ceiling.
   ["/api/auth", 300, 60_000],
 ];
 

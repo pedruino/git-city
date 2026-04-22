@@ -881,13 +881,12 @@ function HomeContent() {
     }
   }, [searchParams]);
 
-  // Server-side sign-in entry point. When SAML SSO is configured, we can't
-  // redirect the main tab to GitLab's SAML (GitLab rejects external redirect
-  // targets post-SAML, leaving the user stranded on gitlab.com). Instead we
-  // open SAML in a popup, wait for the user to authenticate, detect popup
-  // closure, then redirect the main tab straight into OAuth (which now finds
-  // an active SAML session cookie on gitlab.com).
-  const handleSignInWithRef = useCallback(async () => {
+  // Straight OAuth redirect — no SAML popup. GitLab's /oauth/authorize
+  // transparently reuses the user's existing gitlab.com session (which
+  // corporate users always have via their own SAML IdP), so the flow is
+  // click → redirect → auto-approve → callback, zero prompts. Mirrors the
+  // pattern used by the sibling `sensa` project (NextAuth GitLab provider).
+  const handleSignInWithRef = useCallback(() => {
     trackSignInClicked("city");
     let refParam = "";
     try {
@@ -899,66 +898,7 @@ function HomeContent() {
         }
       }
     } catch { /* ignore */ }
-    const continueUrl = `/api/auth/signin?saml_done=1&redirect=${encodeURIComponent("/")}${refParam}`;
-    const rawSamlUrl = process.env.NEXT_PUBLIC_GITLAB_SAML_SSO_URL;
-    if (!rawSamlUrl) {
-      window.location.href = continueUrl;
-      return;
-    }
-    // Tell GitLab SAML where to send the browser after authentication.
-    // The landing route (/auth/saml-done) emits a page that closes itself and
-    // posts a message back to this tab so we can continue without waiting for
-    // the manual close.
-    const samlUrl = (() => {
-      try {
-        const u = new URL(rawSamlUrl);
-        u.searchParams.set("redirect", `${window.location.origin}/auth/saml-done`);
-        return u.toString();
-      } catch {
-        return rawSamlUrl;
-      }
-    })();
-    // Open with a unique window name so we don't reuse a pre-existing popup
-    // (which would instantly appear "closed" to the poll and skip auth).
-    const popupName = `gitlab-saml-${Date.now()}`;
-    const popup = window.open(
-      samlUrl,
-      popupName,
-      "width=900,height=700,menubar=no,toolbar=no,location=yes",
-    );
-    if (!popup || popup.closed) {
-      // Popup blocked or instantly closed → fall back to full-page redirect.
-      window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
-      return;
-    }
-    let finished = false;
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      clearInterval(poll);
-      clearTimeout(timeout);
-      window.removeEventListener("message", onMessage);
-      try { popup.close(); } catch { /* noop */ }
-      window.location.href = continueUrl;
-    };
-    // The /auth/saml-done page posts this message once SAML is complete.
-    // Fast path: no waiting for the 2s popup-close detector.
-    const onMessage = (ev: MessageEvent) => {
-      if (ev.origin !== window.location.origin) return;
-      if (ev.data && ev.data.type === "gitcity:saml-done") finish();
-    };
-    window.addEventListener("message", onMessage);
-    const startedAt = Date.now();
-    const poll = setInterval(() => {
-      // Require at least 2s open before accepting "closed" as intentional —
-      // guards against browsers that flag cross-origin popups as closed too early.
-      if (popup.closed && Date.now() - startedAt > 2000) finish();
-    }, 500);
-    // Safety net: if popup stays open >5min, stop polling.
-    const timeout = setTimeout(() => {
-      window.removeEventListener("message", onMessage);
-      clearInterval(poll);
-    }, 5 * 60 * 1000);
+    window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
   }, []);
 
   // Fetch activity feed on mount + poll every 60s

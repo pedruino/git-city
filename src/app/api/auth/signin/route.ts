@@ -1,37 +1,26 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
-import { ACTIVE_PROVIDER, getProviderConfig } from "@/lib/auth-config";
+import { ACTIVE_PROVIDER } from "@/lib/auth-config";
 
 /**
- * Unified sign-in entry point. Uses the provider configured by
- * NEXT_PUBLIC_AUTH_PROVIDER. If the provider has a SAML SSO URL, redirect
- * there first (with a hop param so we come back here to finish OAuth).
+ * Unified sign-in entry point. Straight OAuth handoff — no separate SAML
+ * pre-hop. `gitlab.com/oauth/authorize` transparently reuses whatever
+ * SAML/OIDC session the browser already has with gitlab.com, so corporate
+ * SSO users land back in the callback without an interactive prompt.
+ * Dropping the SAML detour removed a flaky popup handshake that left users
+ * stranded on gitlab.com when the `redirect` param was ignored.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const searchParams = url.searchParams;
-  // Behind Railway's proxy, request.url reflects the container's internal
-  // origin (http://localhost:8080). Supabase then builds the OAuth redirect
-  // against that private origin and the browser never finds the callback.
-  // Prefer the public URL when configured.
+  // Behind Railway's proxy request.url reflects the container-internal
+  // origin (http://localhost:8080). Using that would make Supabase build
+  // OAuth redirects against the private URL. Prefer NEXT_PUBLIC_BASE_URL.
   const origin = process.env.NEXT_PUBLIC_BASE_URL ?? url.origin;
   const redirectPath = searchParams.get("redirect") ?? "/";
-  const samlDone = searchParams.get("saml_done") === "1";
-  const config = getProviderConfig();
 
-  console.log("[auth/signin] hit", { origin, samlDone, redirectPath, hasSamlUrl: !!config.samlSsoUrl });
+  console.log("[auth/signin] hit", { origin, redirectPath });
 
-  // Step 1 — if provider requires SAML SSO and we haven't passed through it yet,
-  // bounce the user to the SAML endpoint. After SAML, browser returns here via
-  // the `redirect` query param set by the SSO service.
-  if (config.samlSsoUrl && !samlDone) {
-    const returnHere = `${origin}/api/auth/signin?saml_done=1&redirect=${encodeURIComponent(redirectPath)}`;
-    const samlUrl = withRedirect(config.samlSsoUrl, returnHere);
-    console.log("[auth/signin] redirecting to SAML", { samlUrl });
-    return NextResponse.redirect(samlUrl);
-  }
-
-  // Step 2 — normal OAuth with Supabase using the active provider.
   const supabase = await createServerSupabase();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: ACTIVE_PROVIDER,
@@ -55,11 +44,4 @@ export async function GET(request: Request) {
     redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
   });
   return NextResponse.redirect(data.url);
-}
-
-/** Append or replace `?redirect=...` on the SAML URL so it comes back to us. */
-function withRedirect(samlUrl: string, returnTo: string): string {
-  const u = new URL(samlUrl);
-  u.searchParams.set("redirect", returnTo);
-  return u.toString();
 }
