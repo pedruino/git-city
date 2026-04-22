@@ -889,11 +889,24 @@ function HomeContent() {
       }
     } catch { /* ignore */ }
     const continueUrl = `/api/auth/signin?saml_done=1&redirect=${encodeURIComponent("/")}${refParam}`;
-    const samlUrl = process.env.NEXT_PUBLIC_GITLAB_SAML_SSO_URL;
-    if (!samlUrl) {
+    const rawSamlUrl = process.env.NEXT_PUBLIC_GITLAB_SAML_SSO_URL;
+    if (!rawSamlUrl) {
       window.location.href = continueUrl;
       return;
     }
+    // Tell GitLab SAML where to send the browser after authentication.
+    // The landing route (/auth/saml-done) emits a page that closes itself and
+    // posts a message back to this tab so we can continue without waiting for
+    // the manual close.
+    const samlUrl = (() => {
+      try {
+        const u = new URL(rawSamlUrl);
+        u.searchParams.set("redirect", `${window.location.origin}/auth/saml-done`);
+        return u.toString();
+      } catch {
+        return rawSamlUrl;
+      }
+    })();
     // Open with a unique window name so we don't reuse a pre-existing popup
     // (which would instantly appear "closed" to the poll and skip auth).
     const popupName = `gitlab-saml-${Date.now()}`;
@@ -907,17 +920,34 @@ function HomeContent() {
       window.location.href = `/api/auth/signin?redirect=${encodeURIComponent("/")}${refParam}`;
       return;
     }
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearInterval(poll);
+      clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+      try { popup.close(); } catch { /* noop */ }
+      window.location.href = continueUrl;
+    };
+    // The /auth/saml-done page posts this message once SAML is complete.
+    // Fast path: no waiting for the 2s popup-close detector.
+    const onMessage = (ev: MessageEvent) => {
+      if (ev.origin !== window.location.origin) return;
+      if (ev.data && ev.data.type === "gitcity:saml-done") finish();
+    };
+    window.addEventListener("message", onMessage);
     const startedAt = Date.now();
     const poll = setInterval(() => {
       // Require at least 2s open before accepting "closed" as intentional —
       // guards against browsers that flag cross-origin popups as closed too early.
-      if (popup.closed && Date.now() - startedAt > 2000) {
-        clearInterval(poll);
-        window.location.href = continueUrl;
-      }
+      if (popup.closed && Date.now() - startedAt > 2000) finish();
     }, 500);
     // Safety net: if popup stays open >5min, stop polling.
-    setTimeout(() => clearInterval(poll), 5 * 60 * 1000);
+    const timeout = setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      clearInterval(poll);
+    }, 5 * 60 * 1000);
   }, []);
 
   // Fetch activity feed on mount + poll every 60s
