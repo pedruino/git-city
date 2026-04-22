@@ -59,7 +59,10 @@ const TAG_THEMES: Record<string, TagTheme> = {
 export default function RaidTag3D({ width, height, depth, attackerLogin, tagStyle }: Props) {
   const theme = TAG_THEMES[tagStyle] ?? TAG_THEMES.default;
 
-  const tagText = `@${attackerLogin.toUpperCase()} WAS HERE`;
+  // Softplan edition: fixed DITEC branding instead of per-attacker handle.
+  // `attackerLogin` is still accepted for back-compat but no longer rendered.
+  void attackerLogin;
+  const tagText = "DITEC WAS HERE";
 
   const { tex, needsScroll } = useMemo(
     () => createLedTexture(tagText, theme.color, theme.bg),
