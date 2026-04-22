@@ -430,11 +430,11 @@ function RabbitContent() {
         <div className="flex flex-col items-center gap-3 pb-8 sm:pb-10" style={{ pointerEvents: "auto" }}>
           {completed && (
             <a
-              href={`https://x.com/intent/tweet?text=${encodeURIComponent(
+              href={`https://teams.microsoft.com/share?href=${encodeURIComponent("https://thegitcity.com/rabbit")}&msgText=${encodeURIComponent(
                 myPosition
-                  ? `I followed the white rabbit in Git City.\nCitizen #${myPosition} to find the other side.`
+                  ? `I followed the white rabbit in Git City. Citizen #${myPosition} to find the other side.`
                   : `I followed the white rabbit in Git City.`
-              )}&url=${encodeURIComponent("https://thegitcity.com/rabbit")}`}
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               className="font-pixel text-[10px] sm:text-[11px] tracking-widest px-5 py-2 border cursor-pointer transition-all hover:border-[#00ff41] hover:text-[#00ff41]"
@@ -444,7 +444,7 @@ function RabbitContent() {
                 background: "rgba(0,0,0,0.7)",
               }}
             >
-              SHARE ON X
+              SHARE ON TEAMS
             </a>
           )}
           <Link

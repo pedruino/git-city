@@ -471,7 +471,7 @@ function renderLandscape(
               textTransform: "uppercase",
             }}
           >
-            thegitcity.com/dev/{dev.github_login as string}
+            {process.env.NEXT_PUBLIC_CITY_DOMAIN ?? "thegitcity.com"}/dev/{dev.github_login as string}
           </div>
         </div>
       </div>

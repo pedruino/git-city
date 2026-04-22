@@ -750,14 +750,14 @@ export default function SoftplanLandmark({
         const Z_FAR  = BAND_CZ + BLOCK_D / 2 + 18;  // just before deck edge
         const Z_DEPTH = Z_FAR - Z_NEAR;
         const X_SPAN = COMPLEX_W - 32;
-        const COUNT = 26;
+        const COUNT = 14;
 
         return Array.from({ length: COUNT }, (_, idx) => {
           // Deterministic pseudo-random scatter — kills the grid look.
           const hx = ((idx * 127 + 41) % 1000) / 1000;
           const hz = ((idx * 89  + 73) % 1000) / 1000;
-          const skip = ((idx * 37 + 13) % 7);
-          // Drop ~1 in 7 to create irregular gaps between clusters.
+          const skip = ((idx * 37 + 13) % 5);
+          // Drop ~1 in 5 to create irregular gaps between clusters.
           if (skip === 0) return null;
 
           // Base slot + large local jitter so tables cluster and leave holes.
@@ -779,16 +779,16 @@ export default function SoftplanLandmark({
                 <meshStandardMaterial color="#8a5a34" roughness={0.7} metalness={0.1} />
               </mesh>
               {/* candle/lamp on the table — matches deck bar tables */}
-              <mesh position={[0, 2.15, 0]}>
-                <sphereGeometry args={[0.26, 6, 5]} />
+              <mesh position={[0, 2.1, 0]}>
+                <sphereGeometry args={[0.35, 6, 5]} />
                 <meshStandardMaterial
                   color={amberSoft} emissive={amberSoft}
-                  emissiveIntensity={5.5} toneMapped={false}
+                  emissiveIntensity={6.0} toneMapped={false}
                 />
               </mesh>
               <pointLight
                 position={[0, 2.4, 0]}
-                color={amber} intensity={3.5} distance={7} decay={2}
+                color={amber} intensity={6} distance={10} decay={2}
               />
               {/* chairs — 3 around each table, rotated so the pattern varies */}
               {Array.from({ length: 3 }, (_, ci) => {

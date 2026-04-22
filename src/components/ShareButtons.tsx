@@ -79,7 +79,7 @@ export default function ShareButtons({
   return (
     <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-3">
       <a
-        href={`https://x.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(profileUrl)}`}
+        href={`https://teams.microsoft.com/l/chat/0/0?users=&message=${encodeURIComponent(`${tweetText} ${profileUrl}`)}`}
         target="_blank"
         rel="noopener noreferrer"
         className="btn-press px-5 py-2.5 text-[10px] text-bg"
@@ -88,7 +88,7 @@ export default function ShareButtons({
           boxShadow: `3px 3px 0 0 ${shadow}`,
         }}
       >
-        Share on X
+        Share on Teams
       </a>
 
       {/* Download Card */}
