@@ -709,11 +709,22 @@ function HomeContent() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const authLogin = (
-    session?.user?.user_metadata?.user_name ??
-    session?.user?.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
+  const authLogin = (() => {
+    const md = session?.user?.user_metadata;
+    if (!md) return "";
+    // GitHub provides `user_name`; Supabase-normalized OIDC uses
+    // `preferred_username`. GitLab (via Softplan SAML) returns neither —
+    // mirror the server-side fallback in gitlab/index.ts and derive from email.
+    const direct =
+      (md.user_name as string | undefined) ??
+      (md.preferred_username as string | undefined) ??
+      (md.nickname as string | undefined) ??
+      null;
+    if (direct) return direct.toLowerCase();
+    const email = typeof md.email === "string" ? md.email : null;
+    if (email) return email.split("@")[0].toLowerCase();
+    return "";
+  })();
 
   const authAvatar = (session?.user?.user_metadata?.avatar_url ?? "") as string;
   const { pilotsRef: flyPilotsRef, sendMove: flySendMove } = useFlyPresence(
@@ -2063,8 +2074,13 @@ function HomeContent() {
   const handleSignIn = handleSignInWithRef;
 
   const handleSignOut = async () => {
-    await fetch("/api/auth/signout", { method: "POST" });
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+    } catch { /* swallow — we'll still clear state and reload */ }
     setSession(null);
+    // Hard reload to drop any in-memory state (Three.js scene, Supabase realtime
+    // channels, session-derived fetches) and land on the anonymous home.
+    window.location.replace("/");
   };
 
   const handleClaim = async () => {
