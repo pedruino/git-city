@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loginFromSupabaseUser } from "@/lib/auth-identity";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
@@ -74,7 +74,8 @@ export async function GET(request: Request) {
     const supabase = await createServerSupabase();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const githubLogin = loginFromSupabaseUser(user);
+      const { data: { session: __session } } = await supabase.auth.getSession();
+      const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
       if (githubLogin) {
         const { data: myDev } = await sb
           .from("developers")

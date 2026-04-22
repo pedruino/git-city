@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loginFromSupabaseUser } from "@/lib/auth-identity";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { FREE_CLAIM_ITEM, grantFreeClaimItem } from "@/lib/items";
@@ -14,7 +14,8 @@ export async function POST() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = loginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   if (!githubLogin) {
     return NextResponse.json(

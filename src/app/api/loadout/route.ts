@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loginFromSupabaseUser } from "@/lib/auth-identity";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { ZONE_ITEMS } from "@/lib/zones";
@@ -38,7 +38,8 @@ export async function POST(request: Request) {
   }
 
   const admin = getSupabaseAdmin();
-  const githubLogin = loginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   const { data: dev } = await admin
     .from("developers")

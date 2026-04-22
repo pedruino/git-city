@@ -741,22 +741,30 @@ export default function SoftplanLandmark({
 
       {/* Round cafe tables + chairs on the platform strip between the
           building facade (z = BAND_CZ + hd = 18) and the brown deck — the
-          visible "blue plaza" at platform top (y = 3). Two staggered rows
-          so the line reads as organic seating, not a grid. */}
+          visible "blue plaza" at platform top (y = 3). Pseudo-random scatter
+          (not a 2-row grid) so the seating reads as organic clusters, with
+          a small amber candle on each table matching the deck bar vibe. */}
       {(() => {
         const PLATFORM_TOP_Y = 3;
         const Z_NEAR = BAND_CZ + BLOCK_D / 2 + 4;   // closer to building
-        const Z_FAR = BAND_CZ + BLOCK_D / 2 + 18;   // just before deck edge
-        const COLUMNS = 11;
+        const Z_FAR  = BAND_CZ + BLOCK_D / 2 + 18;  // just before deck edge
+        const Z_DEPTH = Z_FAR - Z_NEAR;
         const X_SPAN = COMPLEX_W - 32;
+        const COUNT = 26;
 
-        return Array.from({ length: COLUMNS * 2 }, (_, idx) => {
-          const row = idx % 2;
-          const col = Math.floor(idx / 2);
-          const t = (col + (row === 0 ? 0.25 : 0.75)) / COLUMNS;
-          const tx = -X_SPAN / 2 + t * X_SPAN;
-          const jitter = ((col * 13 + row * 7) % 5) - 2;
-          const tz = (row === 0 ? Z_NEAR : Z_FAR) + jitter * 0.4;
+        return Array.from({ length: COUNT }, (_, idx) => {
+          // Deterministic pseudo-random scatter — kills the grid look.
+          const hx = ((idx * 127 + 41) % 1000) / 1000;
+          const hz = ((idx * 89  + 73) % 1000) / 1000;
+          const skip = ((idx * 37 + 13) % 7);
+          // Drop ~1 in 7 to create irregular gaps between clusters.
+          if (skip === 0) return null;
+
+          // Base slot + large local jitter so tables cluster and leave holes.
+          const t = (idx + 0.5) / COUNT;
+          const clusterJitter = (hx - 0.5) * (X_SPAN / COUNT) * 2.4;
+          const tx = -X_SPAN / 2 + t * X_SPAN + clusterJitter;
+          const tz = Z_NEAR + hz * Z_DEPTH;
 
           return (
             <group key={`plaza-table-${idx}`} position={[tx, PLATFORM_TOP_Y, tz]}>
@@ -770,6 +778,18 @@ export default function SoftplanLandmark({
                 <cylinderGeometry args={[1.5, 1.5, 0.18, 14]} />
                 <meshStandardMaterial color="#8a5a34" roughness={0.7} metalness={0.1} />
               </mesh>
+              {/* candle/lamp on the table — matches deck bar tables */}
+              <mesh position={[0, 2.15, 0]}>
+                <sphereGeometry args={[0.26, 6, 5]} />
+                <meshStandardMaterial
+                  color={amberSoft} emissive={amberSoft}
+                  emissiveIntensity={5.5} toneMapped={false}
+                />
+              </mesh>
+              <pointLight
+                position={[0, 2.4, 0]}
+                color={amber} intensity={3.5} distance={7} decay={2}
+              />
               {/* chairs — 3 around each table, rotated so the pattern varies */}
               {Array.from({ length: 3 }, (_, ci) => {
                 const ang = (ci / 3) * Math.PI * 2 + (idx * 0.4);
