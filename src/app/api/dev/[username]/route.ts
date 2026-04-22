@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { createServerSupabase } from "@/lib/supabase-server";
 import { calculateGithubXp } from "@/lib/xp";
 import { getActiveProvider, ProviderFetchError } from "@/lib/providers";
+import { loginFromSupabaseUser } from "@/lib/auth-identity";
 
 // Allow up to 60s on Vercel (Pro plan). Hobby plan max is 10s.
 export const maxDuration = 60;
@@ -75,11 +76,11 @@ export async function GET(
       const { data: { user } } = await authClient.auth.getUser();
       if (user) {
         authUserId = user.id;
-        const authLogin = (
-          user.user_metadata.user_name ??
-          user.user_metadata.preferred_username ??
-          ""
-        ).toLowerCase();
+        // Use the provider-aware helper so GitLab sessions (whose metadata has
+        // no `user_name`/`preferred_username`) still resolve via nickname or
+        // email-local-part fallback. Without this, the self-heal branch below
+        // never fires for GitLab users whose auth/callback upsert failed.
+        const authLogin = loginFromSupabaseUser(user).toLowerCase();
         isOwnProfile = authLogin === username.toLowerCase();
       }
     } catch {}
