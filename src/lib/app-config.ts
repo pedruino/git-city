@@ -22,5 +22,5 @@ export const appConfig = {
    * Conveys the scope of the fork work. Defaults to "customized & maintained by".
    * Examples: "maintained by", "extended by", "Softplan edition by".
    */
-  forkLabel: process.env.NEXT_PUBLIC_FORK_LABEL ?? "customized & maintained by",
+  forkLabel: process.env.NEXT_PUBLIC_FORK_LABEL ?? "Softplan edition by",
 };
