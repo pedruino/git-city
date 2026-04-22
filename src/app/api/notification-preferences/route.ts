@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const UPDATABLE_FIELDS = [
@@ -32,11 +33,7 @@ export async function GET() {
   }
 
   const sb = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = await resolveLoginFromSupabaseUser(user);
 
   const { data: dev } = await sb
     .from("developers")
@@ -93,11 +90,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json();
   const sb = getSupabaseAdmin();
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = await resolveLoginFromSupabaseUser(user);
 
   const { data: dev } = await sb
     .from("developers")

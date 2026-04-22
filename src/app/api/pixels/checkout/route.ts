@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { createPixelCheckoutSession } from "@/lib/stripe";
 import { createPixQrCodeForPackage } from "@/lib/abacatepay";
@@ -24,11 +25,7 @@ export async function POST(request: Request) {
   }
   lastCheckout.set(user.id, now);
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = await resolveLoginFromSupabaseUser(user);
 
   if (!githubLogin) {
     return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });

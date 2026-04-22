@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase-server";
+import { resolveLoginFromSupabaseUser } from "@/lib/auth-identity";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getDailyMissions, getTodayStr, trackDailyMission } from "@/lib/dailies";
 
@@ -13,11 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const githubLogin = (
-    user.user_metadata?.user_name ??
-    user.user_metadata?.preferred_username ??
-    ""
-  ).toLowerCase();
+  const githubLogin = await resolveLoginFromSupabaseUser(user);
 
   const admin = getSupabaseAdmin();
 
