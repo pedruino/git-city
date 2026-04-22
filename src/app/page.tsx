@@ -33,12 +33,9 @@ import { useFlyPresence } from "@/lib/useFlyPresence";
 import { useRaidSequence } from "@/lib/useRaidSequence";
 import { isFridayThe13th } from "@/lib/raid";
 import { useDailies } from "@/lib/useDailies";
-import InviteCard, { type InvitePreview } from "@/components/InviteCard";
-import XpBar from "@/components/XpBar";
-import PixelBalance from "@/components/PixelBalance";
+import { type InvitePreview } from "@/components/InviteCard";
 import { rankFromLevel, tierFromLevel, levelProgress, xpForLevel } from "@/lib/xp";
 import LoadingScreen, { type LoadingStage } from "@/components/LoadingScreen";
-import RadarMap from "@/components/RadarMap";
 import { getCityCache, setCityCache, clearCityCache } from "@/lib/cityCache";
 import { DEFAULT_SKY_ADS, buildAdLink, trackAdEvent, trackAdEvents, appendClickId, isBuildingAd } from "@/lib/skyAds";
 import { track } from "@vercel/analytics";
@@ -78,6 +75,14 @@ const SponsoredCard = dynamic(() => import("@/lib/sponsors/SponsoredCard"), { ss
 const RabbitCompletion = dynamic(() => import("@/components/RabbitCompletion"), { ssr: false });
 const DistrictChooser = dynamic(() => import("@/components/DistrictChooser"), { ssr: false });
 const LevelUpToast = dynamic(() => import("@/components/LevelUpToast"), { ssr: false });
+// Lazy-loaded — not needed for first paint.
+// InviteCard: only renders when ?invite= deep link is present.
+// XpBar / PixelBalance: only render when user is logged in AND has claimed.
+// RadarMap: depends on `buildings.length > 0` (loads after the city snapshot).
+const InviteCard = dynamic(() => import("@/components/InviteCard"), { ssr: false });
+const XpBar = dynamic(() => import("@/components/XpBar"), { ssr: false });
+const PixelBalance = dynamic(() => import("@/components/PixelBalance"), { ssr: false });
+const RadarMap = dynamic(() => import("@/components/RadarMap"), { ssr: false });
 
 // Feature flags — flip to switch milestone banner
 const MILESTONE_MODE: "stars" | "devs" = "devs"; // "stars" = GitHub stars road to 1K, "devs" = total developers
@@ -3601,18 +3606,10 @@ function HomeContent() {
                   ? `A city of ${stats.total_developers.toLocaleString()} ${providerConfig.displayName} developers. Find yourself.`
                   : `A global city of ${providerConfig.displayName} developers. Find yourself.`}
               </p>
-              <p className="pointer-events-auto mt-1 text-[9px] text-cream/50 normal-case hidden sm:block">
-                built by{" "}
-                <a
-                  href={appConfig.authorUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="transition-colors hover:text-cream"
-                  style={{ color: theme.accent }}
-                >
-                  @{appConfig.authorHandle}
-                </a>
-              </p>
+              <AppCredit
+                accent={theme.accent}
+                className="pointer-events-auto mt-1 text-[9px] text-cream/50 normal-case hidden sm:block"
+              />
             </div>
 
             {/* Milestone progress banner — hidden on mobile to reduce clutter */}

@@ -50,6 +50,15 @@ const BASE_URL =
     ? `https://${process.env.VERCEL_URL}`
     : "http://localhost:3000");
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+// Mirrors the client's cache-bust bucket in page.tsx
+// (`Math.floor(Date.now()/300_000)`). Same bucket → same URL → browser serves
+// the preload from cache when the client's fetch lands.
+const snapshotBucket = Math.floor(Date.now() / 300_000);
+const SNAPSHOT_URL = SUPABASE_URL
+  ? `${SUPABASE_URL}/storage/v1/object/public/city-data/snapshot.json?v=${snapshotBucket}`
+  : null;
+
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
@@ -89,6 +98,24 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
+        {SUPABASE_URL && (
+          <link
+            rel="preconnect"
+            href={SUPABASE_URL}
+            crossOrigin="anonymous"
+          />
+        )}
+        {SNAPSHOT_URL && (
+          // Preload the city snapshot in parallel with the JS bundle so the
+          // client's fetch in page.tsx can resolve from the browser cache
+          // instead of adding a round-trip after hydration.
+          <link
+            rel="preload"
+            as="fetch"
+            href={SNAPSHOT_URL}
+            crossOrigin="anonymous"
+          />
+        )}
         <link
           href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap"
           rel="stylesheet"
