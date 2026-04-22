@@ -13,12 +13,15 @@ export async function GET(request: Request) {
   const samlDone = searchParams.get("saml_done") === "1";
   const config = getProviderConfig();
 
+  console.log("[auth/signin] hit", { origin, samlDone, redirectPath, hasSamlUrl: !!config.samlSsoUrl });
+
   // Step 1 — if provider requires SAML SSO and we haven't passed through it yet,
   // bounce the user to the SAML endpoint. After SAML, browser returns here via
   // the `redirect` query param set by the SSO service.
   if (config.samlSsoUrl && !samlDone) {
     const returnHere = `${origin}/api/auth/signin?saml_done=1&redirect=${encodeURIComponent(redirectPath)}`;
     const samlUrl = withRedirect(config.samlSsoUrl, returnHere);
+    console.log("[auth/signin] redirecting to SAML", { samlUrl });
     return NextResponse.redirect(samlUrl);
   }
 
@@ -36,9 +39,15 @@ export async function GET(request: Request) {
   });
 
   if (error || !data.url) {
+    console.error("[auth/signin] signInWithOAuth failed", { error, hasUrl: !!data?.url });
     return NextResponse.redirect(`${origin}/?error=oauth_failed`);
   }
 
+  console.log("[auth/signin] redirecting to OAuth provider", {
+    provider: ACTIVE_PROVIDER,
+    oauthUrl: data.url,
+    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`,
+  });
   return NextResponse.redirect(data.url);
 }
 
