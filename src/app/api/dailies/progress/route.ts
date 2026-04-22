@@ -27,7 +27,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid mission_id" }, { status: 400 });
   }
 
-  const githubLogin = await resolveLoginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   const admin = getSupabaseAdmin();
 

@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   }
   lastCheckout.set(user.id, now);
 
-  const githubLogin = await resolveLoginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   if (!githubLogin) {
     return NextResponse.json({ error: "No GitHub login found" }, { status: 400 });

@@ -1,5 +1,5 @@
 import { getProviderFromSession } from "@/lib/providers";
-import { fetchGitLabUserById } from "@/lib/providers/gitlab/api";
+import { fetchGitLabCurrentUser, fetchGitLabUserById } from "@/lib/providers/gitlab/api";
 
 type MinimalUser = {
   user_metadata?: Record<string, unknown>;
@@ -37,21 +37,23 @@ export async function resolveLoginFromSupabaseUser(
   const provider = user.app_metadata?.provider;
   if (provider !== "gitlab") return "";
 
+  // Prefer the user's own OAuth access token (from the active Supabase
+  // session) — it authenticates against the authoritative GitLab `/user`
+  // endpoint, so we get the username even for SAML-backed flows where
+  // `/users/:id` returns 403 without credentials. Falls back to the
+  // server-side master token (GITLAB_TOKEN env) only when no access token
+  // was forwarded.
+  if (opts?.accessToken) {
+    const glUser = await fetchGitLabCurrentUser(opts.accessToken);
+    const fromSelf = glUser?.username?.toLowerCase() ?? "";
+    if (fromSelf) return fromSelf;
+  }
+
   const providerId = (user.user_metadata?.provider_id ??
     user.user_metadata?.sub) as string | number | undefined;
   if (providerId) {
     const glUser = await fetchGitLabUserById(providerId, opts?.accessToken);
-    const fromApi = glUser?.username?.toLowerCase() ?? "";
-    if (fromApi) return fromApi;
-  }
-
-  // Last-resort fallback: on Softplan's SAML flow the public GitLab API
-  // returns 403 without a token, so we derive the login from the email
-  // local-part. It matches the GitLab username 1:1 for the @softplan.com.br
-  // corporate tenant (e.g. `sylvio.junior@softplan.com.br` → `sylvio.junior`).
-  const email = user.email ?? (user.user_metadata?.email as string | undefined);
-  if (email && email.includes("@")) {
-    return email.split("@")[0].toLowerCase();
+    return glUser?.username?.toLowerCase() ?? "";
   }
 
   return "";

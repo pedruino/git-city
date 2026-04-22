@@ -13,7 +13,8 @@ export async function GET() {
     return NextResponse.json({ pulls: {} });
   }
 
-  const githubLogin = await resolveLoginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   if (!githubLogin) {
     return NextResponse.json({ pulls: {} });

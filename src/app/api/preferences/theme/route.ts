@@ -18,7 +18,8 @@ export async function GET() {
   }
 
   const sb = getSupabaseAdmin();
-  const githubLogin = await resolveLoginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   const { data: dev } = await sb
     .from("developers")
@@ -54,7 +55,8 @@ export async function PATCH(request: Request) {
   }
 
   const sb = getSupabaseAdmin();
-  const githubLogin = await resolveLoginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   const { error } = await sb
     .from("developers")

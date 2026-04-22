@@ -36,7 +36,10 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
 
+  console.log("[auth/callback] hit", { origin, hasCode: !!code, query: Object.fromEntries(searchParams) });
+
   if (!code) {
+    console.warn("[auth/callback] no code — redirecting with ?error=no_code");
     return NextResponse.redirect(`${origin}/?error=no_code`);
   }
 
@@ -44,8 +47,16 @@ export async function GET(request: Request) {
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error || !data.user) {
+    console.error("[auth/callback] exchangeCodeForSession failed", { error, hasUser: !!data?.user });
     return NextResponse.redirect(`${origin}/?error=auth_failed`);
   }
+
+  console.log("[auth/callback] session exchanged", {
+    userId: data.user.id,
+    email: data.user.email,
+    provider: data.user.app_metadata?.provider,
+    metadataKeys: Object.keys(data.user.user_metadata ?? {}),
+  });
 
   // Enforce tenant allow-list before touching anything. If the email is
   // outside the allow-list we sign the session out so the user ends up

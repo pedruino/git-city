@@ -13,7 +13,8 @@ async function getAuthenticatedDevId(): Promise<{ devId: number } | { error: str
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated", status: 401 };
 
-  const githubLogin = await resolveLoginFromSupabaseUser(user);
+  const { data: { session: __session } } = await supabase.auth.getSession();
+  const githubLogin = await resolveLoginFromSupabaseUser(user, { accessToken: __session?.provider_token ?? undefined });
 
   if (!githubLogin) return { error: "No GitHub login found", status: 400 };
 

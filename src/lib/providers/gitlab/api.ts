@@ -95,6 +95,20 @@ export async function fetchGitLabUserById(id: number | string, accessToken?: str
   }
 }
 
+/**
+ * Resolve the currently authenticated GitLab user from their OAuth access
+ * token. Uses GitLab's authenticated `/user` endpoint, which works on the
+ * public gitlab.com (unlike `/users/:id`, which requires a private token).
+ */
+export async function fetchGitLabCurrentUser(accessToken: string): Promise<GitLabUser | null> {
+  try {
+    const { data } = await glFetch<GitLabUser>("/user", accessToken);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchUserProjects(userId: number, accessToken?: string): Promise<GitLabProject[]> {
   // Fetch pages 1 and 2 in parallel. Most users have < 100 projects, so page 2
   // returns [] quickly; for power users we halve the wall time vs. the serial
