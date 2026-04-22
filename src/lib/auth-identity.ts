@@ -39,8 +39,20 @@ export async function resolveLoginFromSupabaseUser(
 
   const providerId = (user.user_metadata?.provider_id ??
     user.user_metadata?.sub) as string | number | undefined;
-  if (!providerId) return "";
+  if (providerId) {
+    const glUser = await fetchGitLabUserById(providerId, opts?.accessToken);
+    const fromApi = glUser?.username?.toLowerCase() ?? "";
+    if (fromApi) return fromApi;
+  }
 
-  const glUser = await fetchGitLabUserById(providerId, opts?.accessToken);
-  return glUser?.username?.toLowerCase() ?? "";
+  // Last-resort fallback: on Softplan's SAML flow the public GitLab API
+  // returns 403 without a token, so we derive the login from the email
+  // local-part. It matches the GitLab username 1:1 for the @softplan.com.br
+  // corporate tenant (e.g. `sylvio.junior@softplan.com.br` → `sylvio.junior`).
+  const email = user.email ?? (user.user_metadata?.email as string | undefined);
+  if (email && email.includes("@")) {
+    return email.split("@")[0].toLowerCase();
+  }
+
+  return "";
 }
