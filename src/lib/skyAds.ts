@@ -117,27 +117,64 @@ export function trackAdEvents(adId: string, eventTypes: ("impression" | "click" 
   }
 }
 
+/**
+ * Domain shown on the "home" plane ad. Defaults to thegitcity.com so upstream
+ * installs don't break; Softplan deploy overrides with NEXT_PUBLIC_CITY_DOMAIN.
+ */
+const CITY_DOMAIN = (
+  process.env.NEXT_PUBLIC_CITY_DOMAIN ?? "thegitcity.com"
+).replace(/^https?:\/\//, "").replace(/\/$/, "");
+
+/**
+ * Pool of rotating phrases shown on the non-home aerial ads (planes + blimp).
+ * Configure via NEXT_PUBLIC_SKY_AD_PHRASES as a JSON array, e.g.
+ *   '["COMMIT EARLY. COMMIT OFTEN.","SHIP IT — THE CITY IS WATCHING","PROD IS ONE COMMIT AWAY"]'
+ * Falls back to the built-in list below when the env var is missing/invalid.
+ */
+function parseSkyAdPhrases(): string[] {
+  const raw = process.env.NEXT_PUBLIC_SKY_AD_PHRASES;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.every((p) => typeof p === "string" && p.length > 0)) {
+        return parsed;
+      }
+    } catch { /* fall through to defaults */ }
+  }
+  return [
+    "EVERY BUILDING IS A PULL REQUEST",
+    "COMMIT EARLY · COMMIT OFTEN · COMMIT PROUDLY",
+    "THE CITY THAT COMPILES · DEPLOY WITH THE SKYLINE",
+  ];
+}
+
+const SKY_AD_PHRASES = parseSkyAdPhrases();
+
+/**
+ * Which vehicle each rotating phrase rides on. Cycles plane/blimp so the sky
+ * always has variety no matter how many phrases are configured.
+ */
+const ROTATION_VEHICLES: AdVehicle[] = ["plane", "plane", "blimp"];
+
 export const DEFAULT_SKY_ADS: SkyAd[] = [
   {
     id: "gitcity",
-    text: "THEGITCITY.COM ★ YOUR CODE, YOUR CITY ★ THEGITCITY.COM",
+    text: `${CITY_DOMAIN.toUpperCase()} ★ YOUR CODE, YOUR CITY ★ ${CITY_DOMAIN.toUpperCase()}`,
     brand: "Git City",
-    description: "A city built from GitHub contributions. Search your username and find your building among thousands of developers.",
+    description: "A city built from your team's contributions. Search your username and find your building among your colleagues.",
     color: "#f8d880",
     bgColor: "#1a1018",
-    link: "https://thegitcity.com",
+    link: `https://${CITY_DOMAIN}`,
     vehicle: "plane",
     priority: 100,
   },
-  {
-    id: "advertise",
-    text: "ADD YOUR AD HERE",
-    brand: "Sky Ads",
-    description: "Want your brand flying over Git City? Planes, blimps, your colors. Get in touch!",
+  ...SKY_AD_PHRASES.map((text, i) => ({
+    id: `phrase-${i + 1}`,
+    text,
+    brand: "Git City",
     color: "#f8d880",
     bgColor: "#1a1018",
-    link: "https://thegitcity.com/advertise",
-    vehicle: "plane",
-    priority: 10,
-  },
+    vehicle: ROTATION_VEHICLES[i % ROTATION_VEHICLES.length],
+    priority: 90 - i,
+  })),
 ];
